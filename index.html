@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#33503F" />
+  <title>Padel Training</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-top">
+      <h1>Padel Training</h1>
+      <span class="session-badge" id="session-badge">0 séances</span>
+    </div>
+    <p class="app-header-sub" id="next-day-hint"></p>
+  </header>
+
+  <main id="view-container" class="view-container"></main>
+
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="bottom-nav-btn active" data-view="seance">Séance</button>
+    <button class="bottom-nav-btn" data-view="progression">Progression</button>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
