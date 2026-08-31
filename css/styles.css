@@ -186,6 +186,10 @@ button {
   padding: 4px 8px;
 }
 
+.card-header[data-action] {
+  cursor: pointer;
+}
+
 /* Mobility checklist */
 
 .mobility-card .card-header {
@@ -195,6 +199,10 @@ button {
 .mobility-card .card-title,
 .mobility-card .card-title-fr {
   color: var(--white);
+}
+
+.mobility-card .chevron {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .mobility-list {
@@ -314,6 +322,20 @@ button {
   font-weight: 600;
   margin-bottom: 6px;
   display: block;
+}
+
+.stepper-subunit {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.unit-sub {
+  font-size: 0.82em;
+  font-weight: 400;
+  color: var(--text-muted);
 }
 
 .stepper-controls {
