@@ -1,11 +1,13 @@
-import { MOBILITY_ROUTINE, SESSIONS, findExercise } from "./data.js";
+import { MOBILITY_ROUTINE, CONDITIONING_FINISHER, SESSIONS, findExercise } from "./data.js";
 import * as storage from "./storage.js";
 import { renderBodyDiagram } from "./bodyDiagram.js";
 import { getProgressionSuggestion } from "./progression.js";
+import { getCurrentPhase, getStrengthSub } from "./periodization.js";
 
 const viewContainer = document.getElementById("view-container");
 const sessionBadge = document.getElementById("session-badge");
 const nextDayHint = document.getElementById("next-day-hint");
+const phaseHint = document.getElementById("phase-hint");
 const bottomNav = document.getElementById("bottom-nav");
 
 const DAY_LABELS = { a: "Séance A", b: "Séance B", c: "Séance C" };
@@ -16,11 +18,18 @@ const uiState = {
   expanded: new Set(),
   mobilityOpen: false,
   mobilityChecked: new Set(),
+  conditioningOpen: false,
   inputs: {}, // exerciseId -> { weightLb, reps }
   progressionExerciseId: null
 };
 
 let chartInstance = null;
+// Phase de périodisation en cours (reps cibles pour les exercices de force), recalculée à chaque render().
+let currentPhase = getCurrentPhase(storage.getTotalSessions());
+
+function getExerciseSub(exercise) {
+  return exercise.category === "strength" ? getStrengthSub(exercise, currentPhase) : exercise.sub;
+}
 
 // Le poids est saisi/affiché en lb (unité principale) ; le kg (stocké et utilisé pour la
 // logique de progression) est calculé automatiquement et affiché en petit à côté.
@@ -61,7 +70,7 @@ function kgSub(kg) {
 
 function getInput(exerciseId, exercise) {
   if (!uiState.inputs[exerciseId]) {
-    const suggestion = getProgressionSuggestion(exercise);
+    const suggestion = getProgressionSuggestion(exercise, currentPhase);
     uiState.inputs[exerciseId] = {
       weightLb: suggestion ? roundLb(kgToLb(suggestion.suggestedWeight)) : 45,
       reps: suggestion ? suggestion.lastReps : 8
@@ -74,6 +83,7 @@ function updateHeader() {
   const total = storage.getTotalSessions();
   sessionBadge.textContent = `${total} séance${total > 1 ? "s" : ""}`;
   nextDayHint.textContent = `Prochaine séance suggérée : ${DAY_LABELS[storage.getSuggestedNextDay()]}`;
+  phaseHint.textContent = `Phase actuelle (force) : ${currentPhase.label} · bloc ${currentPhase.block}`;
 }
 
 function renderMobilityCard() {
@@ -106,12 +116,39 @@ function renderMobilityCard() {
   `;
 }
 
+function renderConditioningCard() {
+  const items = CONDITIONING_FINISHER.map((item) => `
+    <li class="mobility-item">
+      <span class="mobility-item-text">
+        <span class="mobility-item-name">${item.name}</span><br/>
+        <span class="mobility-item-fr">${item.fr}</span>
+      </span>
+      <span class="mobility-item-sub">${item.sub}</span>
+    </li>
+  `).join("");
+
+  return `
+    <section class="card conditioning-card">
+      <div class="card-header" data-action="toggle-conditioning-section" role="button">
+        <h2 class="card-title">Conditioning<span class="card-title-fr">Finisher, identique à chaque séance</span></h2>
+        <button class="chevron">${uiState.conditioningOpen ? "▲" : "▼"}</button>
+      </div>
+      ${uiState.conditioningOpen ? `
+        <div class="card-body">
+          <ul class="mobility-list">${items}</ul>
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
 function renderExerciseCard(exercise) {
   const isOpen = uiState.expanded.has(exercise.id);
   const input = getInput(exercise.id, exercise);
-  const suggestion = getProgressionSuggestion(exercise);
+  const suggestion = getProgressionSuggestion(exercise, currentPhase);
   const history = storage.getSetsForExercise(exercise.id).slice(-5).reverse();
   const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(exercise.yt)}`;
+  const exerciseSub = getExerciseSub(exercise);
 
   const bodyMarkup = isOpen
     ? `
@@ -124,7 +161,7 @@ function renderExerciseCard(exercise) {
             Dernière fois : <strong>${displayLb(suggestion.lastWeight)} lb</strong> ${kgSub(suggestion.lastWeight)} <strong>× ${suggestion.lastReps}</strong> (${suggestion.lastDate})<br/>
             ${suggestion.reachedTarget
               ? `💡 Fourchette haute atteinte → passe à <strong>${displayLb(suggestion.suggestedWeight)} lb</strong> ${kgSub(suggestion.suggestedWeight)}`
-              : `Vise ${exercise.sub.split("·")[0].trim()} avant d'augmenter le poids.`}
+              : `Vise ${exerciseSub.split("·")[0].trim()} avant d'augmenter le poids.`}
           </div>
         ` : `<div class="suggestion-box">Aucune donnée encore — entre ta première série ci-dessous.</div>`}
 
@@ -164,7 +201,7 @@ function renderExerciseCard(exercise) {
     <section class="card exercise-card">
       <div class="card-header" data-action="toggle-exercise" data-id="${exercise.id}" role="button">
         <h3 class="card-title">${exercise.name}<span class="card-title-fr">${exercise.fr}</span></h3>
-        <span class="card-sub">${exercise.sub}</span>
+        <span class="card-sub">${exerciseSub}</span>
         <button class="chevron">${isOpen ? "▲" : "▼"}</button>
       </div>
       ${bodyMarkup}
@@ -181,14 +218,18 @@ function renderSeanceView() {
     <button class="day-btn ${day === uiState.day ? "active" : ""}" data-action="set-day" data-day="${day}">${day.toUpperCase()}</button>
   `).join("");
 
-  const exerciseCards = exercises.map(renderExerciseCard).join("");
+  const powerBlock = exercises.filter((e) => e.category !== "strength");
+  const strengthBlock = exercises.filter((e) => e.category === "strength");
   const draftCount = draft.sets.length;
 
   return `
     <div class="day-selector">${dayButtons}</div>
     ${renderMobilityCard()}
-    <p class="section-label" style="margin-top:18px;">Renforcement &amp; explosivité</p>
-    ${exerciseCards}
+    <p class="section-label" style="margin-top:18px;">Puissance, medball &amp; core</p>
+    ${powerBlock.map(renderExerciseCard).join("")}
+    <p class="section-label" style="margin-top:18px;">Force</p>
+    ${strengthBlock.map(renderExerciseCard).join("")}
+    ${renderConditioningCard()}
     <p class="draft-hint">${draftCount} série${draftCount > 1 ? "s" : ""} enregistrée${draftCount > 1 ? "s" : ""} dans cette séance</p>
     <button class="btn btn-finish" data-action="finish-session" ${draftCount === 0 ? "disabled" : ""}>Terminer la séance</button>
   `;
@@ -294,6 +335,7 @@ function renderChart() {
 }
 
 function render() {
+  currentPhase = getCurrentPhase(storage.getTotalSessions());
   updateHeader();
   viewContainer.innerHTML = uiState.view === "seance" ? renderSeanceView() : renderProgressionView();
   if (uiState.view === "progression") renderChart();
@@ -313,6 +355,9 @@ viewContainer.addEventListener("click", (e) => {
     render();
   } else if (action === "toggle-mobility-section") {
     uiState.mobilityOpen = !uiState.mobilityOpen;
+    render();
+  } else if (action === "toggle-conditioning-section") {
+    uiState.conditioningOpen = !uiState.conditioningOpen;
     render();
   } else if (action === "toggle-exercise") {
     const id = target.dataset.id;
@@ -341,6 +386,7 @@ viewContainer.addEventListener("click", (e) => {
     uiState.expanded.clear();
     uiState.mobilityOpen = false;
     uiState.mobilityChecked.clear();
+    uiState.conditioningOpen = false;
     uiState.inputs = {};
     render();
   }

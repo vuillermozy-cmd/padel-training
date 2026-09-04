@@ -205,6 +205,25 @@ button {
   color: rgba(255, 255, 255, 0.85);
 }
 
+/* Conditioning finisher (même structure que la routine mobilité, couleur terracotta) */
+
+.conditioning-card {
+  margin-top: 18px;
+}
+
+.conditioning-card .card-header {
+  background: var(--terracotta);
+}
+
+.conditioning-card .card-title,
+.conditioning-card .card-title-fr {
+  color: var(--white);
+}
+
+.conditioning-card .chevron {
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .mobility-list {
   list-style: none;
   margin: 0;

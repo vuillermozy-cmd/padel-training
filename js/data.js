@@ -1,4 +1,9 @@
 // Données du programme — modifiable sans toucher au reste du code.
+//
+// Structure par séance (retour d'entraîneur) : Puissance/Medball/Core (3 séries, explosif)
+// → Force (3 séries, reps pilotées par la périodisation) → Conditioning (finisher, fixe).
+// Catégories d'exercice : "power" | "medball" | "core" (reps fixes, non périodisées)
+// et "strength" (reps pilotées automatiquement par la phase en cours, voir periodization.js).
 
 export const MOBILITY_ROUTINE = [
   { name: "Hip circles / leg swings", fr: "cercles de hanche / balancements", sub: "2 x 10/côté" },
@@ -13,32 +18,36 @@ export const MOBILITY_ROUTINE = [
   { name: "Ankle mobility drill (knee-to-wall)", fr: "mobilité cheville, genou au mur", sub: "2 x 10/côté" }
 ];
 
+// Finisher conditioning, identique à chaque séance (comme la routine mobilité), affiché en fin de séance.
+export const CONDITIONING_FINISHER = [
+  { name: "Assault bike / rameur", fr: "sprints courts haute intensité", sub: "6 x 20s effort max / 40s récup" },
+  { name: "Corde à sauter", fr: "intervalles rythme rapide", sub: "5 x 30s rapide / 30s récup" }
+];
+
 export const SESSIONS = {
   a: [
-    { id: "squat-jump", name: "Squat jump", fr: "squat sauté", sub: "3 x 6 · repos 60s", muscles: { front: ["quads"], back: ["glutes", "calves"] }, yt: "squat jump technique" },
-    { id: "back-squat", name: "Back squat", fr: "squat arrière", sub: "4 x 6-8 · repos 90s", muscles: { front: ["quads"], back: ["glutes", "hamstrings", "lowerback"] }, yt: "back squat technique" },
-    { id: "bulgarian-split-squat", name: "Bulgarian split squat", fr: "fente bulgare", sub: "3 x 8/jambe · repos 75s", muscles: { front: ["quads"], back: ["glutes", "hamstrings"] }, yt: "bulgarian split squat technique" },
-    { id: "bench-press", name: "Bench press", fr: "développé couché", sub: "4 x 8-10 · repos 90s", muscles: { front: ["chest", "shoulders"], back: ["triceps"] }, yt: "bench press technique" },
-    { id: "bent-over-row", name: "Bent-over row", fr: "rowing buste penché", sub: "4 x 8-10 · repos 90s", muscles: { front: ["biceps"], back: ["lats", "traps", "lowerback"] }, yt: "bent over row technique" },
-    { id: "pallof-press", name: "Pallof press", fr: "gainage anti-rotation", sub: "3 x 12/côté", muscles: { front: ["abs", "obliques"], back: [] }, yt: "pallof press technique" }
+    { id: "squat-jump", category: "power", name: "Squat jump", fr: "squat sauté", sub: "3 x 6 · repos 60s", muscles: { front: ["quads"], back: ["glutes", "calves"] }, yt: "squat jump technique" },
+    { id: "medball-rotational-throw", category: "medball", name: "Medicine ball rotational throw", fr: "lancer rotatif medecine ball", sub: "3 x 6/côté · repos 45s", muscles: { front: ["obliques", "abs"], back: ["lats"] }, yt: "medicine ball rotational throw technique" },
+    { id: "pallof-press", category: "core", name: "Pallof press", fr: "gainage anti-rotation", sub: "3 x 12/côté", muscles: { front: ["abs", "obliques"], back: [] }, yt: "pallof press technique" },
+    { id: "goblet-squat", category: "strength", name: "Goblet squat", fr: "squat gobelet", sets: 3, rest: "90s", muscles: { front: ["quads"], back: ["glutes"] }, yt: "goblet squat technique" },
+    { id: "bench-press", category: "strength", name: "Bench press", fr: "développé couché", sets: 3, rest: "90s", muscles: { front: ["chest", "shoulders"], back: ["triceps"] }, yt: "bench press technique" },
+    { id: "bent-over-row", category: "strength", name: "Bent-over row", fr: "rowing buste penché", sets: 3, rest: "90s", muscles: { front: ["biceps"], back: ["lats", "traps", "lowerback"] }, yt: "bent over row technique" }
   ],
   b: [
-    { id: "lateral-bound", name: "Lateral bound (skater jump)", fr: "saut latéral", sub: "3 x 8/côté · repos 60s", muscles: { front: ["quads"], back: ["glutes", "calves"] }, yt: "skater jump lateral bound technique" },
-    { id: "romanian-deadlift", name: "Romanian deadlift", fr: "soulevé de terre roumain", sub: "4 x 8 · repos 90s", muscles: { front: [], back: ["hamstrings", "glutes", "lowerback"] }, yt: "romanian deadlift technique" },
-    { id: "lateral-lunge", name: "Lateral lunge", fr: "fente latérale", sub: "3 x 8/jambe · repos 75s", muscles: { front: ["quads"], back: ["glutes", "hamstrings"] }, yt: "lateral lunge technique" },
-    { id: "overhead-press", name: "Overhead press", fr: "développé militaire", sub: "3 x 10 · repos 75s", muscles: { front: ["shoulders"], back: ["triceps"] }, yt: "overhead press technique" },
-    { id: "lat-pulldown", name: "Lat pulldown", fr: "tirage vertical", sub: "4 x 8-10 · repos 75s", muscles: { front: ["biceps"], back: ["lats"] }, yt: "lat pulldown technique" },
-    { id: "face-pull", name: "Face pull", fr: "tirage visage", sub: "3 x 15 · repos 45s", muscles: { front: ["shoulders"], back: ["traps"] }, yt: "face pull technique shoulder health" },
-    { id: "side-plank", name: "Side plank", fr: "gainage latéral", sub: "3 x 30s/côté", muscles: { front: ["abs", "obliques"], back: [] }, yt: "side plank technique" }
+    { id: "lateral-bound", category: "power", name: "Lateral bound (skater jump)", fr: "saut latéral", sub: "3 x 6/côté · repos 60s", muscles: { front: ["quads"], back: ["glutes", "calves"] }, yt: "skater jump lateral bound technique" },
+    { id: "medball-overhead-slam", category: "medball", name: "Medicine ball overhead slam", fr: "slam medecine ball au-dessus de la tête", sub: "3 x 8 · repos 45s", muscles: { front: ["shoulders", "abs"], back: ["lats", "triceps"] }, yt: "medicine ball overhead slam technique" },
+    { id: "side-plank", category: "core", name: "Side plank", fr: "gainage latéral", sub: "3 x 30s/côté", muscles: { front: ["abs", "obliques"], back: [] }, yt: "side plank technique" },
+    { id: "romanian-deadlift", category: "strength", name: "Romanian deadlift", fr: "soulevé de terre roumain", sets: 3, rest: "90s", muscles: { front: [], back: ["hamstrings", "glutes", "lowerback"] }, yt: "romanian deadlift technique" },
+    { id: "overhead-press", category: "strength", name: "Overhead press", fr: "développé militaire", sets: 3, rest: "75s", muscles: { front: ["shoulders"], back: ["triceps"] }, yt: "overhead press technique" },
+    { id: "lat-pulldown", category: "strength", name: "Lat pulldown", fr: "tirage vertical", sets: 3, rest: "75s", muscles: { front: ["biceps"], back: ["lats"] }, yt: "lat pulldown technique" }
   ],
   c: [
-    { id: "broad-jump", name: "Broad jump", fr: "saut en longueur", sub: "3 x 5", muscles: { front: ["quads"], back: ["glutes", "calves"] }, yt: "broad jump technique" },
-    { id: "front-squat", name: "Front squat / goblet squat", fr: "squat avant / squat gobelet", sub: "4 x 8 · repos 90s", muscles: { front: ["quads"], back: ["glutes"] }, yt: "front squat goblet squat technique" },
-    { id: "step-up", name: "Step-up", fr: "montée sur banc", sub: "3 x 8/jambe · repos 75s", muscles: { front: ["quads"], back: ["glutes", "hamstrings"] }, yt: "step up exercise technique" },
-    { id: "incline-db-press", name: "Incline dumbbell press", fr: "développé incliné haltères", sub: "4 x 8-10 · repos 90s", muscles: { front: ["chest", "shoulders"], back: ["triceps"] }, yt: "incline dumbbell press technique" },
-    { id: "single-arm-row", name: "Single-arm dumbbell row", fr: "rowing haltère unilatéral", sub: "4 x 8-10/côté · repos 75s", muscles: { front: ["biceps"], back: ["lats", "traps"] }, yt: "single arm dumbbell row technique" },
-    { id: "external-rotation", name: "External rotation (cable/band)", fr: "rotation externe poulie/élastique", sub: "3 x 15", muscles: { front: ["shoulders"], back: [] }, yt: "external rotation cable shoulder technique" },
-    { id: "dead-bug", name: "Dead bug", fr: "gainage anti-extension", sub: "3 x 10/côté", muscles: { front: ["abs"], back: [] }, yt: "dead bug exercise technique" }
+    { id: "broad-jump", category: "power", name: "Broad jump", fr: "saut en longueur", sub: "3 x 5 · repos 60s", muscles: { front: ["quads"], back: ["glutes", "calves"] }, yt: "broad jump technique" },
+    { id: "medball-scoop-toss", category: "medball", name: "Medicine ball scoop toss", fr: "lancer scoop medecine ball", sub: "3 x 8 · repos 45s", muscles: { front: ["quads", "abs"], back: ["glutes", "hamstrings"] }, yt: "medicine ball scoop toss technique" },
+    { id: "dead-bug", category: "core", name: "Dead bug", fr: "gainage anti-extension", sub: "3 x 10/côté", muscles: { front: ["abs"], back: [] }, yt: "dead bug exercise technique" },
+    { id: "bulgarian-split-squat", category: "strength", name: "Bulgarian split squat", fr: "fente bulgare", sets: 3, rest: "75s", muscles: { front: ["quads"], back: ["glutes", "hamstrings"] }, yt: "bulgarian split squat technique" },
+    { id: "incline-db-press", category: "strength", name: "Incline dumbbell press", fr: "développé incliné haltères", sets: 3, rest: "90s", muscles: { front: ["chest", "shoulders"], back: ["triceps"] }, yt: "incline dumbbell press technique" },
+    { id: "single-arm-row", category: "strength", name: "Single-arm dumbbell row", fr: "rowing haltère unilatéral", sets: 3, rest: "75s", muscles: { front: ["biceps"], back: ["lats", "traps"] }, yt: "single arm dumbbell row technique" }
   ]
 };
 
