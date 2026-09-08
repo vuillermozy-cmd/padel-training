@@ -19,3 +19,7 @@ Puis ouvrir `http://localhost:8000`.
 3. L'app sera disponible à `https://<compte>.github.io/<nom-du-depot>/`.
 
 Aucune étape de build n'est nécessaire.
+
+## Crédits
+
+Les photos de démonstration des exercices (`img/exercises/`) proviennent de [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (domaine public, licence Unlicense).

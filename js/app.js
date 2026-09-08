@@ -1,8 +1,32 @@
 import { MOBILITY_ROUTINE, CONDITIONING_FINISHER, SESSIONS, findExercise } from "./data.js";
 import * as storage from "./storage.js";
-import { renderBodyDiagram } from "./bodyDiagram.js";
 import { getProgressionSuggestion } from "./progression.js";
 import { getCurrentPhase, getStrengthSub } from "./periodization.js";
+
+// Photos de démonstration (position de départ / position finale) issues de free-exercise-db
+// (domaine public, github.com/yuhonas/free-exercise-db), stockées localement dans img/exercises/<id>/.
+const PHOTO_TOGGLE_INTERVAL_MS = 700;
+
+function getExercisePhotoFrames(exerciseId) {
+  return [`img/exercises/${exerciseId}/0.jpg`, `img/exercises/${exerciseId}/1.jpg`];
+}
+
+function renderExercisePhoto(exercise) {
+  const [frame0, frame1] = getExercisePhotoFrames(exercise.id);
+  return `
+    <div class="exercise-photo-wrap">
+      <img class="exercise-photo" src="${frame0}" data-frame0="${frame0}" data-frame1="${frame1}" data-current="0" alt="Démonstration : ${exercise.name}" />
+    </div>
+  `;
+}
+
+setInterval(() => {
+  document.querySelectorAll(".exercise-photo").forEach((img) => {
+    const showFrame1 = img.dataset.current === "0";
+    img.src = showFrame1 ? img.dataset.frame1 : img.dataset.frame0;
+    img.dataset.current = showFrame1 ? "1" : "0";
+  });
+}, PHOTO_TOGGLE_INTERVAL_MS);
 
 const viewContainer = document.getElementById("view-container");
 const sessionBadge = document.getElementById("session-badge");
@@ -153,7 +177,7 @@ function renderExerciseCard(exercise) {
   const bodyMarkup = isOpen
     ? `
       <div class="card-body">
-        ${renderBodyDiagram(exercise.muscles)}
+        ${renderExercisePhoto(exercise)}
         <a class="yt-link" href="${ytUrl}" target="_blank" rel="noopener noreferrer">▶ Voir une démo vidéo</a>
 
         ${suggestion ? `

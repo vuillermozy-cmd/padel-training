@@ -272,41 +272,23 @@ button {
   white-space: nowrap;
 }
 
-/* Body diagram */
+/* Exercise demo photo (2 frames en alternance façon GIF) */
 
-.body-diagram-pair {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
+.exercise-photo-wrap {
   margin: 8px 0 14px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--beige);
 }
 
-.body-diagram-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.body-diagram {
-  width: 72px;
-  height: 132px;
-}
-
-.body-outline {
-  fill: none;
-  stroke: #b9c2ba;
-  stroke-width: 2.5;
-}
-
-.muscle-highlight {
-  fill: var(--terracotta);
-  opacity: 0.85;
-}
-
-.body-diagram-label {
-  font-size: 0.72rem;
-  color: var(--text-muted);
+.exercise-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 260px;
+  object-fit: contain;
+  background: var(--beige);
 }
 
 /* YouTube link */
