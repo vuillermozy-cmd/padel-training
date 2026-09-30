@@ -140,8 +140,8 @@ function renderMobilityCard() {
   `;
 }
 
-function renderConditioningCard() {
-  const items = CONDITIONING_FINISHER.map((item) => `
+function renderFinisherItem(item) {
+  return `
     <li class="mobility-item">
       <span class="mobility-item-text">
         <span class="mobility-item-name">${item.name}</span><br/>
@@ -149,8 +149,10 @@ function renderConditioningCard() {
       </span>
       <span class="mobility-item-sub">${item.sub}</span>
     </li>
-  `).join("");
+  `;
+}
 
+function renderConditioningCard() {
   return `
     <section class="card conditioning-card">
       <div class="card-header" data-action="toggle-conditioning-section" role="button">
@@ -159,11 +161,26 @@ function renderConditioningCard() {
       </div>
       ${uiState.conditioningOpen ? `
         <div class="card-body">
-          <ul class="mobility-list">${items}</ul>
+          <ul class="mobility-list">${renderFinisherItem(CONDITIONING_FINISHER.main)}</ul>
+          <p class="section-label finisher-alt-label">Ou, au choix</p>
+          <ul class="mobility-list">${CONDITIONING_FINISHER.alternatives.map(renderFinisherItem).join("")}</ul>
         </div>
       ` : ""}
     </section>
   `;
+}
+
+function renderSuggestionHint(exercise, suggestion, exerciseSub) {
+  if (!suggestion.reachedTarget) {
+    return `Vise ${exerciseSub.split("·")[0].trim()} avant ${exercise.assisted ? "de réduire l'assistance" : "d'augmenter le poids"}.`;
+  }
+  if (exercise.assisted && suggestion.suggestedWeight === 0) {
+    return "💡 Fourchette haute atteinte → passe aux tractions au poids du corps !";
+  }
+  const target = `<strong>${displayLb(suggestion.suggestedWeight)} lb</strong> ${kgSub(suggestion.suggestedWeight)}`;
+  return exercise.assisted
+    ? `💡 Fourchette haute atteinte → réduis l'assistance à ${target}`
+    : `💡 Fourchette haute atteinte → passe à ${target}`;
 }
 
 function renderExerciseCard(exercise) {
@@ -182,16 +199,14 @@ function renderExerciseCard(exercise) {
 
         ${suggestion ? `
           <div class="suggestion-box">
-            Dernière fois : <strong>${displayLb(suggestion.lastWeight)} lb</strong> ${kgSub(suggestion.lastWeight)} <strong>× ${suggestion.lastReps}</strong> (${suggestion.lastDate})<br/>
-            ${suggestion.reachedTarget
-              ? `💡 Fourchette haute atteinte → passe à <strong>${displayLb(suggestion.suggestedWeight)} lb</strong> ${kgSub(suggestion.suggestedWeight)}`
-              : `Vise ${exerciseSub.split("·")[0].trim()} avant d'augmenter le poids.`}
+            Dernière fois : <strong>${displayLb(suggestion.lastWeight)} lb</strong> ${kgSub(suggestion.lastWeight)}${exercise.assisted ? " d'assistance" : ""} <strong>× ${suggestion.lastReps}</strong> (${suggestion.lastDate})<br/>
+            ${renderSuggestionHint(exercise, suggestion, exerciseSub)}
           </div>
-        ` : `<div class="suggestion-box">Aucune donnée encore — entre ta première série ci-dessous.</div>`}
+        ` : `<div class="suggestion-box">Aucune donnée encore — entre ta première série ci-dessous.${exercise.assisted ? " Le poids à saisir est l'assistance (machine ou élastique)." : ""}</div>`}
 
         <div class="stepper-row">
           <div class="stepper">
-            <span class="stepper-label">Poids (lb)</span>
+            <span class="stepper-label">${exercise.assisted ? "Assistance (lb)" : "Poids (lb)"}</span>
             <div class="stepper-controls">
               <button class="stepper-btn" data-action="dec-weight" data-id="${exercise.id}">−</button>
               <input class="stepper-input" type="number" inputmode="decimal" step="${WEIGHT_STEP_LB}" data-role="weight-input" data-id="${exercise.id}" value="${formatWeight(input.weightLb)}" />
@@ -259,8 +274,9 @@ function renderSeanceView() {
   `;
 }
 
+// Liste unique des exercices (les tractions sont présentes dans les 3 séances).
 function allExercisesFlat() {
-  return Object.values(SESSIONS).flat();
+  return [...new Map(Object.values(SESSIONS).flat().map((ex) => [ex.id, ex])).values()];
 }
 
 function renderProgressionView() {

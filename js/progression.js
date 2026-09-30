@@ -13,6 +13,7 @@ export function getTargetRepsUpperBound(exercise, phase) {
 
 // Suggestion de progression basée sur la dernière série loguée.
 // Retourne null si aucun historique, sinon { lastWeight, lastReps, lastDate, suggestedWeight, reachedTarget }.
+// Pour un exercice assisté, le poids est l'assistance : progresser = la réduire (jusqu'à 0).
 export function getProgressionSuggestion(exercise, phase) {
   const last = getLastSetForExercise(exercise.id);
   if (!last) return null;
@@ -20,7 +21,8 @@ export function getProgressionSuggestion(exercise, phase) {
   const upperBound = getTargetRepsUpperBound(exercise, phase);
   const reachedTarget = upperBound !== null && last.reps >= upperBound;
   const increment = isLowerBodyExercise(exercise) ? 5 : 2.5;
-  const suggestedWeight = reachedTarget ? +(last.weight + increment).toFixed(1) : last.weight;
+  const nextWeight = exercise.assisted ? Math.max(0, last.weight - increment) : last.weight + increment;
+  const suggestedWeight = reachedTarget ? +nextWeight.toFixed(1) : last.weight;
 
   return {
     lastWeight: last.weight,
