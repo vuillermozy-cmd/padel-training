@@ -22,7 +22,7 @@ export const CONDITIONING_FINISHER = {
   main: { name: "Sled push + agility ladder", fr: "poussée de traîneau + échelle d'agilité", sub: "5 tours : 20 m sled + 2 passages échelle · récup 60-90s" },
   alternatives: [
     { name: "Assault bike / rameur", fr: "sprints courts haute intensité", sub: "6 x 20s effort max / 40s récup" },
-    { name: "Jump rope", fr: "corde à sauter, intervalles rythme rapide", sub: "5 x 30s rapide / 30s récup" }
+    { name: "Burpees + mountain climbers", fr: "circuit poids du corps, sans matériel", sub: "5 tours : 10 burpees + 20 mountain climbers · récup 45s" }
   ]
 };
 
@@ -51,7 +51,8 @@ export const SESSIONS = {
   ],
   c: [
     { id: "broad-jump", category: "power", name: "Broad jump", fr: "saut en longueur", sub: "3 x 5 · repos 60s", muscles: { front: ["quads"], back: ["glutes", "calves"] }, yt: "broad jump technique" },
-    { id: "medball-scoop-toss", category: "medball", name: "Medicine ball scoop toss", fr: "lancer scoop medecine ball", sub: "3 x 8 · repos 45s", muscles: { front: ["quads", "abs"], back: ["glutes", "hamstrings"] }, yt: "medicine ball scoop toss technique" },
+    // noPhoto : aucune photo libre de droits ne montre ce mouvement (lancer de côté contre un mur), seul le lien vidéo est affiché.
+    { id: "medball-scoop-toss", category: "medball", noPhoto: true, name: "Medicine ball side scoop toss", fr: "lancer latéral contre un mur (medecine ball)", sub: "3 x 8/côté · repos 45s", muscles: { front: ["obliques", "abs"], back: ["glutes"] }, yt: "medicine ball rotational scoop toss against wall" },
     { id: "dead-bug", category: "core", name: "Dead bug", fr: "gainage anti-extension", sub: "3 x 10/côté", muscles: { front: ["abs"], back: [] }, yt: "dead bug exercise technique" },
     { id: "bulgarian-split-squat", category: "strength", name: "Bulgarian split squat", fr: "fente bulgare", sets: 3, rest: "75s", muscles: { front: ["quads"], back: ["glutes", "hamstrings"] }, yt: "bulgarian split squat technique" },
     { id: "incline-db-press", category: "strength", name: "Incline dumbbell press", fr: "développé incliné haltères", sets: 3, rest: "90s", muscles: { front: ["chest", "shoulders"], back: ["triceps"] }, yt: "incline dumbbell press technique" },

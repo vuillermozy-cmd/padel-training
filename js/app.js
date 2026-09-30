@@ -12,6 +12,7 @@ function getExercisePhotoFrames(exerciseId) {
 }
 
 function renderExercisePhoto(exercise) {
+  if (exercise.noPhoto) return "";
   const [frame0, frame1] = getExercisePhotoFrames(exercise.id);
   return `
     <div class="exercise-photo-wrap">
