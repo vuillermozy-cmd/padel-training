@@ -405,18 +405,28 @@ button {
   background: var(--green-dark);
 }
 
-.btn-finish {
-  background: var(--terracotta);
-  color: var(--white);
-  margin-top: 4px;
+.btn-secondary {
+  background: var(--white);
+  color: var(--green);
+  border: 1px solid var(--green);
+  text-align: center;
+  margin-top: 10px;
+  cursor: pointer;
 }
 
-.btn-finish:active {
-  background: var(--terracotta-dark);
+.btn-secondary:active {
+  background: var(--beige);
 }
 
-.btn-finish:disabled {
-  background: var(--line);
+/* Sauvegarde (onglet Progression) */
+
+.backup-card {
+  margin-top: 18px;
+}
+
+.backup-message {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
   color: var(--text-muted);
 }
 
@@ -464,7 +474,7 @@ button {
   text-align: center;
   font-size: 0.82rem;
   color: var(--text-muted);
-  margin-bottom: 8px;
+  margin: 14px 0 8px;
 }
 
 /* Progression view */

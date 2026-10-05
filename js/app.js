@@ -40,18 +40,19 @@ const DAY_LABELS = { a: "Séance A", b: "Séance B", c: "Séance C" };
 
 const uiState = {
   view: "seance",
-  day: storage.getDraft().day || storage.getSuggestedNextDay(),
+  day: storage.getSuggestedNextDay(),
   expanded: new Set(),
   mobilityOpen: false,
   mobilityChecked: new Set(),
   conditioningOpen: false,
   inputs: {}, // exerciseId -> { weightLb, reps, distanceM } (selon la mesure de l'exercice)
-  progressionExerciseId: null
+  progressionExerciseId: null,
+  backupMessage: ""
 };
 
 let chartInstance = null;
 // Phase de périodisation en cours (reps cibles pour les exercices de force), recalculée à chaque render().
-let currentPhase = getCurrentPhase(storage.getTotalSessions());
+let currentPhase = getCurrentPhase(storage.getFirstSessionDate(), storage.today());
 
 const DISTANCE_STEP_M = 5;
 
@@ -100,11 +101,20 @@ function getInput(exerciseId, exercise) {
   return uiState.inputs[exerciseId];
 }
 
+function formatDateFr(isoDate) {
+  const [y, m, d] = isoDate.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 function updateHeader() {
   const total = storage.getTotalSessions();
+  const firstDate = storage.getFirstSessionDate();
   sessionBadge.textContent = `${total} séance${total > 1 ? "s" : ""}`;
-  nextDayHint.textContent = `Prochaine séance suggérée : ${DAY_LABELS[storage.getSuggestedNextDay()]}`;
-  phaseHint.textContent = `Phase actuelle (force) : ${currentPhase.label} · bloc ${currentPhase.block}`;
+  nextDayHint.textContent = storage.hasTrainedToday()
+    ? `Séance du jour : ${DAY_LABELS[storage.getSuggestedNextDay()]}`
+    : `Prochaine séance suggérée : ${DAY_LABELS[storage.getSuggestedNextDay()]}`;
+  phaseHint.textContent = `Phase actuelle (force) : ${currentPhase.label} · bloc ${currentPhase.block}`
+    + (firstDate ? ` · depuis le ${formatDateFr(firstDate)}` : "");
 }
 
 function renderMobilityCard() {
@@ -276,8 +286,6 @@ function renderExerciseCard(exercise) {
 }
 
 function renderSeanceView() {
-  storage.setActiveDay(uiState.day);
-  const draft = storage.getDraft();
   const exercises = SESSIONS[uiState.day];
 
   const dayButtons = Object.keys(SESSIONS).map((day) => `
@@ -286,7 +294,7 @@ function renderSeanceView() {
 
   const powerBlock = exercises.filter((e) => e.category !== "strength");
   const strengthBlock = exercises.filter((e) => e.category === "strength");
-  const draftCount = draft.sets.length;
+  const todayCount = storage.getTodaySets().length;
 
   return `
     <div class="day-selector">${dayButtons}</div>
@@ -296,8 +304,7 @@ function renderSeanceView() {
     <p class="section-label" style="margin-top:18px;">Force</p>
     ${strengthBlock.map(renderExerciseCard).join("")}
     ${renderConditioningCard()}
-    <p class="draft-hint">${draftCount} série${draftCount > 1 ? "s" : ""} enregistrée${draftCount > 1 ? "s" : ""} dans cette séance</p>
-    <button class="btn btn-finish" data-action="finish-session" ${draftCount === 0 ? "disabled" : ""}>Terminer la séance</button>
+    <p class="draft-hint">${todayCount} série${todayCount > 1 ? "s" : ""} enregistrée${todayCount > 1 ? "s" : ""} aujourd'hui · sauvegarde automatique</p>
   `;
 }
 
@@ -306,10 +313,49 @@ function allExercisesFlat() {
   return [...new Map(Object.values(SESSIONS).flat().map((ex) => [ex.id, ex])).values()];
 }
 
+function renderBackupCard() {
+  return `
+    <section class="card backup-card">
+      <div class="card-header">
+        <h2 class="card-title">Sauvegarde<span class="card-title-fr">Tes données restent dans ce navigateur : exporte-les de temps en temps</span></h2>
+      </div>
+      <div class="card-body">
+        <button class="btn btn-primary" data-action="export-data">Exporter mes données</button>
+        <label class="btn btn-secondary" for="import-file">Restaurer une sauvegarde</label>
+        <input type="file" id="import-file" accept="application/json,.json" hidden />
+        ${uiState.backupMessage ? `<p class="backup-message">${uiState.backupMessage}</p>` : ""}
+      </div>
+    </section>
+  `;
+}
+
+function exportBackup() {
+  const blob = new Blob([storage.exportData()], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `padel-training-sauvegarde-${storage.today()}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const added = storage.importData(reader.result);
+      uiState.backupMessage = `Sauvegarde restaurée : ${added} série${added > 1 ? "s" : ""} ajoutée${added > 1 ? "s" : ""}.`;
+    } catch (e) {
+      uiState.backupMessage = "Ce fichier n'est pas une sauvegarde valide.";
+    }
+    render();
+  };
+  reader.readAsText(file);
+}
+
 function renderProgressionView() {
   const total = storage.getTotalSessions();
-  const allSessions = storage.getAllLoggedSessions();
-  const totalSets = allSessions.reduce((acc, s) => acc + s.sets.length, 0);
+  const totalSets = storage.getAllSets().length;
 
   if (!uiState.progressionExerciseId) {
     uiState.progressionExerciseId = allExercisesFlat()[0].id;
@@ -320,11 +366,7 @@ function renderProgressionView() {
     <option value="${ex.id}" ${ex.id === uiState.progressionExerciseId ? "selected" : ""}>${ex.name} (${ex.fr})</option>
   `).join("");
 
-  const rows = allSessions
-    .flatMap((session) => session.sets
-      .filter((set) => set.exerciseId === selected.id)
-      .map((set) => ({ ...set, date: session.date, day: session.day.toUpperCase() })))
-    .sort((a, b) => b.timestamp - a.timestamp);
+  const rows = storage.getSetsForExercise(selected.id).reverse();
 
   return `
     <div class="progress-summary">
@@ -348,10 +390,12 @@ function renderProgressionView() {
       <table class="history-table">
         <thead><tr><th>Date</th><th>Séance</th><th>Série</th></tr></thead>
         <tbody>
-          ${rows.map((r) => `<tr><td>${r.date}</td><td>${r.day}</td><td>${formatSet(selected, r)}</td></tr>`).join("")}
+          ${rows.map((r) => `<tr><td>${formatDateFr(r.date)}</td><td>${r.day.toUpperCase()}</td><td>${formatSet(selected, r)}</td></tr>`).join("")}
         </tbody>
       </table>
     ` : `<p class="empty-state">Aucune série loguée pour cet exercice.</p>`}
+
+    ${renderBackupCard()}
   `;
 }
 
@@ -396,7 +440,7 @@ function renderChart() {
 }
 
 function render() {
-  currentPhase = getCurrentPhase(storage.getTotalSessions());
+  currentPhase = getCurrentPhase(storage.getFirstSessionDate(), storage.today());
   updateHeader();
   viewContainer.innerHTML = uiState.view === "seance" ? renderSeanceView() : renderProgressionView();
   if (uiState.view === "progression") renderChart();
@@ -440,16 +484,10 @@ viewContainer.addEventListener("click", (e) => {
   } else if (action === "inc-distance" || action === "dec-distance") {
     input.distanceM = clampDistance(input.distanceM + (action === "inc-distance" ? DISTANCE_STEP_M : -DISTANCE_STEP_M));
   } else if (action === "save-set") {
-    storage.logSet(ex.id, setValues(ex, input));
-  } else if (action === "finish-session") {
-    if (target.disabled) return;
-    storage.finishSession();
-    uiState.day = storage.getSuggestedNextDay();
-    uiState.expanded.clear();
-    uiState.mobilityOpen = false;
-    uiState.mobilityChecked.clear();
-    uiState.conditioningOpen = false;
-    uiState.inputs = {};
+    storage.logSet(ex.id, uiState.day, setValues(ex, input));
+  } else if (action === "export-data") {
+    exportBackup();
+    uiState.backupMessage = "Fichier de sauvegarde téléchargé. Garde-le hors du navigateur (Fichiers, iCloud, e-mail).";
   } else {
     return;
   }
@@ -476,6 +514,8 @@ viewContainer.addEventListener("change", (e) => {
   } else if (target.id === "exercise-select") {
     uiState.progressionExerciseId = target.value;
     render();
+  } else if (target.id === "import-file" && target.files.length) {
+    importBackup(target.files[0]);
   }
 });
 
