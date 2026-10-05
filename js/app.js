@@ -2,6 +2,7 @@ import { MOBILITY_ROUTINE, CONDITIONING_FINISHER, SESSIONS, findExercise } from 
 import * as storage from "./storage.js";
 import { getProgressionSuggestion } from "./progression.js";
 import { getCurrentPhase, getStrengthSub } from "./periodization.js";
+import { lbToKg, snapWeight, stepWeight, DEFAULT_WEIGHT_LB } from "./weights.js";
 
 // Photos de démonstration (position de départ / position finale) issues de free-exercise-db
 // (domaine public, github.com/yuhonas/free-exercise-db), stockées localement dans img/exercises/<id>/.
@@ -44,7 +45,7 @@ const uiState = {
   mobilityOpen: false,
   mobilityChecked: new Set(),
   conditioningOpen: false,
-  inputs: {}, // exerciseId -> { weightLb, reps }
+  inputs: {}, // exerciseId -> { weightLb, reps, distanceM } (selon la mesure de l'exercice)
   progressionExerciseId: null
 };
 
@@ -52,54 +53,49 @@ let chartInstance = null;
 // Phase de périodisation en cours (reps cibles pour les exercices de force), recalculée à chaque render().
 let currentPhase = getCurrentPhase(storage.getTotalSessions());
 
+const DISTANCE_STEP_M = 5;
+
 function getExerciseSub(exercise) {
+  if (exercise.repScheme === "max") return `${exercise.sets} x max · repos ${exercise.rest}`;
   return exercise.category === "strength" ? getStrengthSub(exercise, currentPhase) : exercise.sub;
 }
 
-// Le poids est saisi/affiché en lb (unité principale) ; le kg (stocké et utilisé pour la
-// logique de progression) est calculé automatiquement et affiché en petit à côté.
-const LB_PER_KG = 2.2046226218;
-const WEIGHT_STEP_LB = 5;
-
-function kgToLb(kg) {
-  return kg * LB_PER_KG;
+function hasWeight(exercise) {
+  return exercise.metric === "load" || exercise.metric === "carry";
 }
 
-function lbToKg(lb) {
-  return lb / LB_PER_KG;
-}
-
+// Le poids est saisi et affiché en lb (unité principale), le kg est calculé et affiché en petit à côté.
 function formatWeight(w) {
   return Number.isInteger(w) ? String(w) : w.toFixed(1);
 }
 
-function roundLb(v) {
-  return Math.max(0, Math.round(v * 2) / 2);
+function kgSub(weightLb) {
+  return `<span class="unit-sub">(${formatWeight(Math.round(lbToKg(weightLb) * 10) / 10)} kg)</span>`;
 }
 
-function roundKg(v) {
-  return Math.max(0, Math.round(v * 10) / 10);
+function weightLabel(exercise) {
+  if (exercise.equipment === "medball") return "Balle (lb)";
+  if (exercise.perDumbbell) return "Poids par haltère (lb)";
+  return "Poids (lb)";
 }
 
-function displayLb(kg) {
-  return formatWeight(roundLb(kgToLb(kg)));
-}
-
-function displayKg(kg) {
-  return formatWeight(roundKg(kg));
-}
-
-function kgSub(kg) {
-  return `<span class="unit-sub">(${displayKg(kg)} kg)</span>`;
+// Série formatée selon la mesure de l'exercice (fiche, historique, onglet Progression).
+function formatSet(exercise, set) {
+  if (exercise.metric === "reps") return `${set.reps} reps`;
+  const weight = `${formatWeight(set.weightLb)} lb ${kgSub(set.weightLb)}`;
+  return exercise.metric === "carry" ? `${weight} · ${set.distanceM} m` : `${weight} × ${set.reps}`;
 }
 
 function getInput(exerciseId, exercise) {
   if (!uiState.inputs[exerciseId]) {
     const suggestion = getProgressionSuggestion(exercise, currentPhase);
-    uiState.inputs[exerciseId] = {
-      weightLb: suggestion ? roundLb(kgToLb(suggestion.suggestedWeight)) : 45,
-      reps: suggestion ? suggestion.lastReps : 8
-    };
+    uiState.inputs[exerciseId] = suggestion
+      ? { ...suggestion.next }
+      : {
+          weightLb: DEFAULT_WEIGHT_LB[exercise.equipment],
+          reps: exercise.repScheme === "max" ? 3 : 8,
+          distanceM: exercise.targetDistanceM
+        };
   }
   return uiState.inputs[exerciseId];
 }
@@ -172,16 +168,61 @@ function renderConditioningCard() {
 }
 
 function renderSuggestionHint(exercise, suggestion, exerciseSub) {
-  if (!suggestion.reachedTarget) {
-    return `Vise ${exerciseSub.split("·")[0].trim()} avant ${exercise.assisted ? "de réduire l'assistance" : "d'augmenter le poids"}.`;
+  const { next } = suggestion;
+  if (exercise.metric === "reps") {
+    return exercise.repScheme === "max"
+      ? `💡 Vise <strong>${next.reps} reps</strong> sur ta meilleure série, une de plus que la dernière fois.`
+      : "";
   }
-  if (exercise.assisted && suggestion.suggestedWeight === 0) {
-    return "💡 Fourchette haute atteinte → passe aux tractions au poids du corps !";
+  if (exercise.equipment === "medball") {
+    return "Garde la même balle et vise la vitesse d'exécution.";
   }
-  const target = `<strong>${displayLb(suggestion.suggestedWeight)} lb</strong> ${kgSub(suggestion.suggestedWeight)}`;
-  return exercise.assisted
-    ? `💡 Fourchette haute atteinte → réduis l'assistance à ${target}`
-    : `💡 Fourchette haute atteinte → passe à ${target}`;
+  const nextWeight = `<strong>${formatWeight(next.weightLb)} lb</strong> ${kgSub(next.weightLb)}`;
+  if (exercise.metric === "carry") {
+    return suggestion.reachedTarget
+      ? `💡 ${exercise.targetDistanceM} m atteints → passe à ${nextWeight}`
+      : `Vise ${exercise.targetDistanceM} m par côté avant d'augmenter le poids.`;
+  }
+  return suggestion.reachedTarget
+    ? `💡 Fourchette haute atteinte → passe à ${nextWeight}`
+    : `Vise ${exerciseSub.split("·")[0].trim()} avant d'augmenter le poids.`;
+}
+
+function renderStepper({ label, action, role, id, value, step, inputmode, sub }) {
+  return `
+    <div class="stepper">
+      <span class="stepper-label">${label}</span>
+      <div class="stepper-controls">
+        <button class="stepper-btn" data-action="dec-${action}" data-id="${id}">−</button>
+        <input class="stepper-input" type="number" inputmode="${inputmode}" step="${step}" data-role="${role}" data-id="${id}" value="${value}" />
+        <button class="stepper-btn" data-action="inc-${action}" data-id="${id}">+</button>
+      </div>
+      ${sub ? `<span class="stepper-subunit">${sub}</span>` : ""}
+    </div>
+  `;
+}
+
+function renderSteppers(exercise, input) {
+  const steppers = [];
+  if (hasWeight(exercise)) {
+    steppers.push(renderStepper({
+      label: weightLabel(exercise), action: "weight", role: "weight-input", id: exercise.id,
+      value: formatWeight(input.weightLb), step: "any", inputmode: "decimal",
+      sub: `≈ ${formatWeight(Math.round(lbToKg(input.weightLb) * 10) / 10)} kg`
+    }));
+  }
+  if (exercise.metric === "carry") {
+    steppers.push(renderStepper({
+      label: "Distance (m)", action: "distance", role: "distance-input", id: exercise.id,
+      value: input.distanceM, step: DISTANCE_STEP_M, inputmode: "numeric"
+    }));
+  } else {
+    steppers.push(renderStepper({
+      label: "Reps", action: "reps", role: "reps-input", id: exercise.id,
+      value: input.reps, step: 1, inputmode: "numeric"
+    }));
+  }
+  return `<div class="stepper-row">${steppers.join("")}</div>`;
 }
 
 function renderExerciseCard(exercise) {
@@ -192,45 +233,30 @@ function renderExerciseCard(exercise) {
   const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(exercise.yt)}`;
   const exerciseSub = getExerciseSub(exercise);
 
+  let suggestionBox = `<div class="suggestion-box">Aucune donnée encore — entre ta première série ci-dessous.</div>`;
+  if (suggestion) {
+    const hint = renderSuggestionHint(exercise, suggestion, exerciseSub);
+    suggestionBox = `
+      <div class="suggestion-box">
+        Dernière fois : <strong>${formatSet(exercise, suggestion.last)}</strong> (${suggestion.last.date})
+        ${hint ? `<br/>${hint}` : ""}
+      </div>
+    `;
+  }
+
   const bodyMarkup = isOpen
     ? `
       <div class="card-body">
         ${renderExercisePhoto(exercise)}
         <a class="yt-link" href="${ytUrl}" target="_blank" rel="noopener noreferrer">▶ Voir une démo vidéo</a>
-
-        ${suggestion ? `
-          <div class="suggestion-box">
-            Dernière fois : <strong>${displayLb(suggestion.lastWeight)} lb</strong> ${kgSub(suggestion.lastWeight)}${exercise.assisted ? " d'assistance" : ""} <strong>× ${suggestion.lastReps}</strong> (${suggestion.lastDate})<br/>
-            ${renderSuggestionHint(exercise, suggestion, exerciseSub)}
-          </div>
-        ` : `<div class="suggestion-box">Aucune donnée encore — entre ta première série ci-dessous.${exercise.assisted ? " Le poids à saisir est l'assistance (machine ou élastique)." : ""}</div>`}
-
-        <div class="stepper-row">
-          <div class="stepper">
-            <span class="stepper-label">${exercise.assisted ? "Assistance (lb)" : "Poids (lb)"}</span>
-            <div class="stepper-controls">
-              <button class="stepper-btn" data-action="dec-weight" data-id="${exercise.id}">−</button>
-              <input class="stepper-input" type="number" inputmode="decimal" step="${WEIGHT_STEP_LB}" data-role="weight-input" data-id="${exercise.id}" value="${formatWeight(input.weightLb)}" />
-              <button class="stepper-btn" data-action="inc-weight" data-id="${exercise.id}">+</button>
-            </div>
-            <span class="stepper-subunit">≈ ${displayKg(lbToKg(input.weightLb))} kg</span>
-          </div>
-          <div class="stepper">
-            <span class="stepper-label">Reps</span>
-            <div class="stepper-controls">
-              <button class="stepper-btn" data-action="dec-reps" data-id="${exercise.id}">−</button>
-              <input class="stepper-input" type="number" inputmode="numeric" step="1" data-role="reps-input" data-id="${exercise.id}" value="${input.reps}" />
-              <button class="stepper-btn" data-action="inc-reps" data-id="${exercise.id}">+</button>
-            </div>
-          </div>
-        </div>
-
+        ${suggestionBox}
+        ${renderSteppers(exercise, input)}
         <button class="btn btn-primary" data-action="save-set" data-id="${exercise.id}">Enregistrer cette série</button>
 
         ${history.length ? `
           <p class="section-label" style="margin-top:14px;">Historique récent</p>
           <ul class="history-list">
-            ${history.map((h) => `<li><span>${h.date}</span><span>${displayLb(h.weight)} lb ${kgSub(h.weight)} × ${h.reps}</span></li>`).join("")}
+            ${history.map((h) => `<li><span>${h.date}</span><span>${formatSet(exercise, h)}</span></li>`).join("")}
           </ul>
         ` : ""}
       </div>
@@ -288,20 +314,17 @@ function renderProgressionView() {
   if (!uiState.progressionExerciseId) {
     uiState.progressionExerciseId = allExercisesFlat()[0].id;
   }
+  const selected = findExercise(uiState.progressionExerciseId);
 
   const options = allExercisesFlat().map((ex) => `
     <option value="${ex.id}" ${ex.id === uiState.progressionExerciseId ? "selected" : ""}>${ex.name} (${ex.fr})</option>
   `).join("");
 
-  const rows = [];
-  allSessions.forEach((session) => {
-    session.sets.forEach((set) => {
-      const ex = findExercise(set.exerciseId);
-      rows.push({ date: session.date, day: session.day.toUpperCase(), exercise: ex ? ex.name : set.exerciseId, weight: set.weight, reps: set.reps, timestamp: set.timestamp });
-    });
-  });
-  rows.sort((a, b) => b.timestamp - a.timestamp);
-  const filteredRows = rows.filter((r) => findExerciseIdByName(r.exercise) === uiState.progressionExerciseId);
+  const rows = allSessions
+    .flatMap((session) => session.sets
+      .filter((set) => set.exerciseId === selected.id)
+      .map((set) => ({ ...set, date: session.date, day: session.day.toUpperCase() })))
+    .sort((a, b) => b.timestamp - a.timestamp);
 
   return `
     <div class="progress-summary">
@@ -321,29 +344,26 @@ function renderProgressionView() {
       <canvas id="progress-chart" height="180"></canvas>
     </div>
 
-    ${filteredRows.length ? `
+    ${rows.length ? `
       <table class="history-table">
-        <thead><tr><th>Date</th><th>Séance</th><th>Poids</th><th>Reps</th></tr></thead>
+        <thead><tr><th>Date</th><th>Séance</th><th>Série</th></tr></thead>
         <tbody>
-          ${filteredRows.map((r) => `<tr><td>${r.date}</td><td>${r.day}</td><td>${displayLb(r.weight)} lb ${kgSub(r.weight)}</td><td>${r.reps}</td></tr>`).join("")}
+          ${rows.map((r) => `<tr><td>${r.date}</td><td>${r.day}</td><td>${formatSet(selected, r)}</td></tr>`).join("")}
         </tbody>
       </table>
     ` : `<p class="empty-state">Aucune série loguée pour cet exercice.</p>`}
   `;
 }
 
-function findExerciseIdByName(name) {
-  const ex = allExercisesFlat().find((e) => e.name === name);
-  return ex ? ex.id : null;
-}
-
 function renderChart() {
   const canvas = document.getElementById("progress-chart");
   if (!canvas || typeof Chart === "undefined") return;
 
-  const sets = storage.getSetsForExercise(uiState.progressionExerciseId);
+  const exercise = findExercise(uiState.progressionExerciseId);
+  const byReps = exercise.metric === "reps";
+  const sets = storage.getSetsForExercise(exercise.id);
   const labels = sets.map((s) => s.date);
-  const data = sets.map((s) => roundLb(kgToLb(s.weight)));
+  const data = sets.map((s) => (byReps ? s.reps : s.weightLb));
 
   if (chartInstance) {
     chartInstance.destroy();
@@ -355,7 +375,7 @@ function renderChart() {
     data: {
       labels,
       datasets: [{
-        label: "Poids (lb)",
+        label: byReps ? "Reps" : "Poids (lb)",
         data,
         borderColor: "#C1652F",
         backgroundColor: "rgba(193, 101, 47, 0.15)",
@@ -386,40 +406,41 @@ function clampReps(v) {
   return Math.max(1, Math.round(v));
 }
 
+function clampDistance(v) {
+  return Math.max(DISTANCE_STEP_M, Math.round(v / DISTANCE_STEP_M) * DISTANCE_STEP_M);
+}
+
+// Valeurs à enregistrer pour une série, selon la mesure de l'exercice.
+function setValues(exercise, input) {
+  if (exercise.metric === "reps") return { reps: input.reps };
+  if (exercise.metric === "carry") return { weightLb: input.weightLb, distanceM: input.distanceM };
+  return { weightLb: input.weightLb, reps: input.reps };
+}
+
 viewContainer.addEventListener("click", (e) => {
   const target = e.target.closest("[data-action]");
   if (!target) return;
   const action = target.dataset.action;
+  const ex = target.dataset.id ? findExercise(target.dataset.id) : null;
+  const input = ex ? getInput(ex.id, ex) : null;
 
   if (action === "set-day") {
     uiState.day = target.dataset.day;
-    render();
   } else if (action === "toggle-mobility-section") {
     uiState.mobilityOpen = !uiState.mobilityOpen;
-    render();
   } else if (action === "toggle-conditioning-section") {
     uiState.conditioningOpen = !uiState.conditioningOpen;
-    render();
   } else if (action === "toggle-exercise") {
-    const id = target.dataset.id;
-    if (uiState.expanded.has(id)) uiState.expanded.delete(id);
-    else uiState.expanded.add(id);
-    render();
+    if (uiState.expanded.has(ex.id)) uiState.expanded.delete(ex.id);
+    else uiState.expanded.add(ex.id);
   } else if (action === "inc-weight" || action === "dec-weight") {
-    const ex = findExercise(target.dataset.id);
-    const input = getInput(ex.id, ex);
-    input.weightLb = roundLb(input.weightLb + (action === "inc-weight" ? WEIGHT_STEP_LB : -WEIGHT_STEP_LB));
-    render();
+    input.weightLb = stepWeight(ex.equipment, input.weightLb, action === "inc-weight" ? 1 : -1);
   } else if (action === "inc-reps" || action === "dec-reps") {
-    const ex = findExercise(target.dataset.id);
-    const input = getInput(ex.id, ex);
     input.reps = clampReps(input.reps + (action === "inc-reps" ? 1 : -1));
-    render();
+  } else if (action === "inc-distance" || action === "dec-distance") {
+    input.distanceM = clampDistance(input.distanceM + (action === "inc-distance" ? DISTANCE_STEP_M : -DISTANCE_STEP_M));
   } else if (action === "save-set") {
-    const ex = findExercise(target.dataset.id);
-    const input = getInput(ex.id, ex);
-    storage.logSet(ex.id, roundKg(lbToKg(input.weightLb)), input.reps);
-    render();
+    storage.logSet(ex.id, setValues(ex, input));
   } else if (action === "finish-session") {
     if (target.disabled) return;
     storage.finishSession();
@@ -429,23 +450,29 @@ viewContainer.addEventListener("click", (e) => {
     uiState.mobilityChecked.clear();
     uiState.conditioningOpen = false;
     uiState.inputs = {};
-    render();
+  } else {
+    return;
   }
+  render();
 });
 
 viewContainer.addEventListener("change", (e) => {
   const target = e.target;
+  const ex = target.dataset.id ? findExercise(target.dataset.id) : null;
   if (target.dataset.action === "toggle-mobility") {
     const idx = parseInt(target.dataset.idx, 10);
     if (target.checked) uiState.mobilityChecked.add(idx);
     else uiState.mobilityChecked.delete(idx);
     target.closest(".mobility-item").classList.toggle("checked", target.checked);
   } else if (target.dataset.role === "weight-input") {
-    const ex = findExercise(target.dataset.id);
-    getInput(ex.id, ex).weightLb = roundLb(parseFloat(target.value) || 0);
+    // Une saisie libre est ramenée au poids standard le plus proche (ex. 52 → 50 lb).
+    getInput(ex.id, ex).weightLb = snapWeight(ex.equipment, parseFloat(target.value) || 0);
+    render();
   } else if (target.dataset.role === "reps-input") {
-    const ex = findExercise(target.dataset.id);
     getInput(ex.id, ex).reps = clampReps(parseInt(target.value, 10) || 1);
+  } else if (target.dataset.role === "distance-input") {
+    getInput(ex.id, ex).distanceM = clampDistance(parseInt(target.value, 10) || 0);
+    render();
   } else if (target.id === "exercise-select") {
     uiState.progressionExerciseId = target.value;
     render();

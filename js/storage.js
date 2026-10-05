@@ -1,13 +1,28 @@
 // Persistance locale (localStorage) — aucune donnée ne quitte l'appareil.
 
+import { LB_PER_KG } from "./weights.js";
+
 const STORAGE_KEY = "padel-training-data-v1";
 
 function defaultState() {
   return {
     totalSessions: 0,
-    history: [], // séances terminées : { id, day, date, completedAt, sets: [{exerciseId, weight, reps, timestamp}] }
+    // séances terminées : { id, day, date, completedAt, sets: [{exerciseId, weightLb?, reps?, distanceM?, timestamp}] }
+    history: [],
     draft: { day: null, sets: [] } // séance en cours, pas encore "terminée"
   };
+}
+
+// Les premières versions stockaient le poids en kg (champ "weight") ; il est désormais en lb ("weightLb").
+// Les saisies d'origine étaient en lb, l'arrondi au 0.5 lb retrouve donc la valeur tapée.
+function migrateKgToLb(state) {
+  [...state.history.flatMap((s) => s.sets), ...state.draft.sets].forEach((set) => {
+    if (typeof set.weight === "number" && set.weightLb === undefined) {
+      set.weightLb = Math.round(set.weight * LB_PER_KG * 2) / 2;
+      delete set.weight;
+    }
+  });
+  return state;
 }
 
 function load() {
@@ -15,7 +30,7 @@ function load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw);
-    return { ...defaultState(), ...parsed };
+    return migrateKgToLb({ ...defaultState(), ...parsed });
   } catch (e) {
     console.warn("Lecture localStorage impossible, réinitialisation.", e);
     return defaultState();
@@ -48,8 +63,9 @@ export function setActiveDay(day) {
 }
 
 // Enregistre une série pour un exercice (fiche exercice → "Enregistrer cette série").
-export function logSet(exerciseId, weight, reps) {
-  const entry = { exerciseId, weight, reps, timestamp: Date.now() };
+// values : les champs de la mesure de l'exercice, parmi { weightLb, reps, distanceM }.
+export function logSet(exerciseId, values) {
+  const entry = { exerciseId, ...values, timestamp: Date.now() };
   state.draft.sets.push(entry);
   save(state);
   return entry;
