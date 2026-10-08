@@ -70,6 +70,17 @@ function save() {
 
 let state = load();
 
+// Abonnés prévenus quand des séries sont ajoutées sur cet appareil (utilisé par la synchro).
+const changeListeners = [];
+
+export function onChange(listener) {
+  changeListeners.push(listener);
+}
+
+function notifyChange() {
+  changeListeners.forEach((listener) => listener());
+}
+
 // Demande au navigateur de ne pas effacer ces données pour libérer de la place.
 if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().catch(() => {});
@@ -82,6 +93,7 @@ export function logSet(exerciseId, day, values) {
   const entry = { exerciseId, day, date: localDate(timestamp), timestamp, ...values };
   state.sets.push(entry);
   save();
+  notifyChange();
   return entry;
 }
 
@@ -141,14 +153,30 @@ export function exportData() {
   return JSON.stringify({ app: "padel-training", exportedAt: new Date().toISOString(), ...state }, null, 2);
 }
 
-// Restauration : fusionne les séries du fichier avec celles déjà présentes (sans doublons).
-// Retourne le nombre de séries ajoutées.
-export function importData(json) {
-  const incoming = migrate(JSON.parse(json)).sets.filter((set) => set.exerciseId && set.timestamp && set.date);
-  const key = (set) => `${set.exerciseId}-${set.timestamp}`;
-  const existing = new Set(state.sets.map(key));
-  const added = incoming.filter((set) => !existing.has(key(set)));
-  state.sets.push(...added);
-  save();
+// Une série est identifiée par son exercice et l'instant où elle a été enregistrée.
+export function setKey(set) {
+  return `${set.exerciseId}-${set.timestamp}`;
+}
+
+// Lit un fichier de sauvegarde ou de synchro (tous formats) et retourne ses séries valides.
+export function parseSets(json) {
+  return migrate(JSON.parse(json)).sets.filter((set) => set.exerciseId && set.timestamp && set.date);
+}
+
+// Fusionne des séries avec celles déjà présentes (sans doublons). Retourne le nombre de séries ajoutées.
+// silent : ne pas prévenir les abonnés (la synchro fusionne ce qu'elle vient elle-même de lire).
+export function mergeSets(incoming, { silent = false } = {}) {
+  const existing = new Set(state.sets.map(setKey));
+  const added = incoming.filter((set) => !existing.has(setKey(set)));
+  if (added.length) {
+    state.sets.push(...added);
+    save();
+    if (!silent) notifyChange();
+  }
   return added.length;
+}
+
+// Restauration d'un fichier de sauvegarde. Retourne le nombre de séries ajoutées.
+export function importData(json) {
+  return mergeSets(parseSets(json));
 }

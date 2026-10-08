@@ -1,5 +1,6 @@
 import { MOBILITY_ROUTINE, ROUTINE_MEDIA, FINISHERS, COOLDOWN, DUO_REST, SESSIONS, findExercise, exerciseName } from "./data.js";
 import * as storage from "./storage.js";
+import * as sync from "./sync.js";
 import { getProgressionSuggestion } from "./progression.js";
 import { getCurrentPhase, getStrengthSub } from "./periodization.js";
 import { lbToKg, snapWeight, stepWeight, DEFAULT_WEIGHT_LB } from "./weights.js";
@@ -423,6 +424,57 @@ function renderBackupCard() {
   `;
 }
 
+function formatTime(timestamp) {
+  const d = new Date(timestamp);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function renderSyncCard() {
+  const status = sync.getStatus();
+  const error = status.state === "error" ? `<p class="sync-error">${status.message}</p>` : "";
+
+  if (!sync.isEnabled()) {
+    return `
+      <section class="card sync-card">
+        <div class="card-header">
+          <h2 class="card-title">Synchronisation entre appareils<span class="card-title-fr">Le même historique sur ton téléphone et ton laptop</span></h2>
+        </div>
+        <div class="card-body">
+          <p class="sync-text">Tes séances sont rangées dans un fichier privé sur ton compte GitHub. À faire une fois sur chaque appareil :</p>
+          <ol class="sync-steps">
+            <li><a href="${sync.TOKEN_URL}" target="_blank" rel="noopener noreferrer">Crée une clé GitHub</a> : laisse coché seulement « gist », choisis une expiration longue, puis « Generate token ».</li>
+            <li>Copie la clé et colle-la ici.</li>
+          </ol>
+          <input class="sync-input" type="password" id="sync-token" placeholder="ghp_…" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          <button class="btn btn-primary" data-action="enable-sync" ${status.state === "syncing" ? "disabled" : ""}>${status.state === "syncing" ? "Connexion…" : "Activer la synchro"}</button>
+          ${error}
+        </div>
+      </section>
+    `;
+  }
+
+  const stateText = {
+    syncing: "Synchronisation en cours…",
+    ok: status.lastSync ? `Synchronisé à ${formatTime(status.lastSync)}` : "Synchronisé",
+    idle: "Synchro activée",
+    error: "Dernière synchro en échec"
+  }[status.state];
+
+  return `
+    <section class="card sync-card">
+      <div class="card-header">
+        <h2 class="card-title">Synchronisation entre appareils<span class="card-title-fr">${stateText}</span></h2>
+      </div>
+      <div class="card-body">
+        ${error}
+        <button class="btn btn-primary" data-action="sync-now" ${status.state === "syncing" ? "disabled" : ""}>Synchroniser maintenant</button>
+        <button class="btn btn-secondary" data-action="disable-sync">Désactiver sur cet appareil</button>
+        <p class="sync-text sync-link"><a href="${sync.getGistUrl()}" target="_blank" rel="noopener noreferrer">Voir le fichier de synchro sur GitHub</a></p>
+      </div>
+    </section>
+  `;
+}
+
 function exportBackup() {
   const blob = new Blob([storage.exportData()], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -489,6 +541,7 @@ function renderProgressionView() {
       </table>
     ` : `<p class="empty-state">Aucune série loguée pour cet exercice.</p>`}
 
+    ${renderSyncCard()}
     ${renderBackupCard()}
   `;
 }
@@ -588,6 +641,12 @@ viewContainer.addEventListener("click", (e) => {
     input.distanceM = clampDistance(input.distanceM + (action === "inc-distance" ? DISTANCE_STEP_M : -DISTANCE_STEP_M));
   } else if (action === "save-set") {
     storage.logSet(ex.id, uiState.day, setValues(ex, input));
+  } else if (action === "enable-sync") {
+    sync.enable(document.getElementById("sync-token").value);
+  } else if (action === "sync-now") {
+    sync.syncNow();
+  } else if (action === "disable-sync") {
+    sync.disable();
   } else if (action === "export-data") {
     exportBackup();
     uiState.backupMessage = "Fichier de sauvegarde téléchargé. Garde-le hors du navigateur (Fichiers, iCloud, e-mail).";
@@ -634,6 +693,16 @@ historySheet.addEventListener("click", (e) => {
   render();
 });
 
+// Synchro : l'affichage suit l'état de la synchro, et on récupère les séances des autres appareils
+// à l'ouverture de l'app, quand on y revient, et quand la connexion revient.
+sync.onStatus(() => render());
+if (typeof document.addEventListener === "function") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") sync.syncNow();
+  });
+}
+if (typeof window !== "undefined") window.addEventListener("online", () => sync.syncNow());
+
 bottomNav.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-view]");
   if (!btn) return;
@@ -643,3 +712,4 @@ bottomNav.addEventListener("click", (e) => {
 });
 
 render();
+sync.syncNow();

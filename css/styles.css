@@ -664,6 +664,60 @@ button {
   margin-top: 18px;
 }
 
+/* Synchronisation (onglet Progression) */
+
+.sync-card {
+  margin-top: 18px;
+}
+
+.sync-text {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.sync-steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.sync-steps a,
+.sync-link a {
+  color: var(--terracotta-dark);
+  font-weight: 600;
+}
+
+.sync-link {
+  margin: 12px 0 0;
+  text-align: center;
+}
+
+.sync-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  margin-bottom: 10px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.sync-error {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fbeee6;
+  color: var(--terracotta-dark);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+}
+
 .backup-message {
   margin: 10px 0 0;
   font-size: 0.82rem;
