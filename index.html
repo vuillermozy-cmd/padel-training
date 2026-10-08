@@ -11,13 +11,15 @@
   <header class="app-header">
     <div class="app-header-top">
       <h1>Padel Training</h1>
-      <span class="session-badge" id="session-badge">0 séances</span>
+      <button class="session-badge" id="session-badge" aria-label="Voir l'historique des séances">0 séances</button>
     </div>
     <p class="app-header-sub" id="next-day-hint"></p>
     <p class="app-header-sub" id="phase-hint"></p>
   </header>
 
   <main id="view-container" class="view-container"></main>
+
+  <div id="history-sheet"></div>
 
   <nav class="bottom-nav" id="bottom-nav">
     <button class="bottom-nav-btn active" data-view="seance">Séance</button>

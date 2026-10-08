@@ -63,8 +63,18 @@ button {
   font-size: 0.8rem;
   font-weight: 600;
   padding: 4px 10px;
+  border: none;
   border-radius: 999px;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.session-badge::after {
+  content: " ›";
+}
+
+.session-badge:active {
+  background: var(--terracotta-dark);
 }
 
 .app-header-sub {
@@ -224,8 +234,184 @@ button {
   color: rgba(255, 255, 255, 0.85);
 }
 
-.finisher-alt-label {
-  margin: 14px 0 0;
+/* Options de finisher : texte empilé sur toute la largeur */
+
+.finisher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.finisher-option {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--terracotta);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.finisher-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--terracotta-dark);
+}
+
+.finisher-name {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.finisher-fr {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.finisher-detail {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+/* Retour au calme (même structure que la routine mobilité) */
+
+.cooldown-card {
+  margin-top: 12px;
+}
+
+.cooldown-card .card-header {
+  background: var(--green-dark);
+}
+
+.cooldown-card .card-title,
+.cooldown-card .card-title-fr {
+  color: var(--white);
+}
+
+.cooldown-card .chevron {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Duos de la section Puissance, medball & core */
+
+.duo-group {
+  border-left: 3px solid var(--green);
+  padding-left: 10px;
+  margin-bottom: 14px;
+}
+
+.duo-header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+.duo-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--green);
+}
+
+.duo-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.duo-tag {
+  display: inline-block;
+  min-width: 26px;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--green);
+  color: var(--white);
+  font-size: 0.75rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Historique des séances (feuille ouverte depuis le compteur) */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--white);
+  border-radius: 16px 16px 0 0;
+  padding: 16px 16px 24px;
+  z-index: 21;
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.sheet-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.sheet-close {
+  border: none;
+  background: none;
+  font-size: 1.2rem;
+  padding: 6px 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.history-sessions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.history-session {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-session:last-child {
+  border-bottom: none;
+}
+
+.history-session-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.history-session-date {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.history-session-day {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--terracotta-dark);
+}
+
+.history-session-detail {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .mobility-list {

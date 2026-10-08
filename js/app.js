@@ -1,4 +1,4 @@
-import { MOBILITY_ROUTINE, CONDITIONING_FINISHER, SESSIONS, findExercise } from "./data.js";
+import { MOBILITY_ROUTINE, FINISHERS, COOLDOWN, DUO_REST, SESSIONS, findExercise, exerciseName } from "./data.js";
 import * as storage from "./storage.js";
 import { getProgressionSuggestion } from "./progression.js";
 import { getCurrentPhase, getStrengthSub } from "./periodization.js";
@@ -31,6 +31,7 @@ setInterval(() => {
 }, PHOTO_TOGGLE_INTERVAL_MS);
 
 const viewContainer = document.getElementById("view-container");
+const historySheet = document.getElementById("history-sheet");
 const sessionBadge = document.getElementById("session-badge");
 const nextDayHint = document.getElementById("next-day-hint");
 const phaseHint = document.getElementById("phase-hint");
@@ -45,6 +46,9 @@ const uiState = {
   mobilityOpen: false,
   mobilityChecked: new Set(),
   conditioningOpen: false,
+  cooldownOpen: false,
+  cooldownChecked: new Set(),
+  historyOpen: false,
   inputs: {}, // exerciseId -> { weightLb, reps, distanceM } (selon la mesure de l'exercice)
   progressionExerciseId: null,
   backupMessage: ""
@@ -117,62 +121,63 @@ function updateHeader() {
     + (firstDate ? ` · depuis le ${formatDateFr(firstDate)}` : "");
 }
 
-function renderMobilityCard() {
-  const items = MOBILITY_ROUTINE.map((item, idx) => {
-    const checked = uiState.mobilityChecked.has(idx);
-    return `
-      <li class="mobility-item ${checked ? "checked" : ""}">
-        <input type="checkbox" data-action="toggle-mobility" data-idx="${idx}" ${checked ? "checked" : ""} />
-        <span class="mobility-item-text">
-          <span class="mobility-item-name">${item.name}</span><br/>
-          <span class="mobility-item-fr">${item.fr}</span>
-        </span>
-        <span class="mobility-item-sub">${item.sub}</span>
-      </li>
-    `;
-  }).join("");
-
-  return `
-    <section class="card mobility-card">
-      <div class="card-header" data-action="toggle-mobility-section" role="button">
-        <h2 class="card-title">Routine Mobilité &amp; Souplesse<span class="card-title-fr">Identique à chaque séance</span></h2>
-        <button class="chevron">${uiState.mobilityOpen ? "▲" : "▼"}</button>
-      </div>
-      ${uiState.mobilityOpen ? `
-        <div class="card-body">
-          <ul class="mobility-list">${items}</ul>
-        </div>
-      ` : ""}
-    </section>
-  `;
-}
-
-function renderFinisherItem(item) {
-  return `
-    <li class="mobility-item">
+// Carte repliable avec une liste à cocher (routine mobilité, retour au calme).
+function renderChecklistCard({ cardClass, toggleAction, checkAction, title, subtitle, items, open, checked }) {
+  const rows = items.map((item, idx) => `
+    <li class="mobility-item ${checked.has(idx) ? "checked" : ""}">
+      <input type="checkbox" data-action="${checkAction}" data-idx="${idx}" ${checked.has(idx) ? "checked" : ""} />
       <span class="mobility-item-text">
         <span class="mobility-item-name">${item.name}</span><br/>
         <span class="mobility-item-fr">${item.fr}</span>
       </span>
       <span class="mobility-item-sub">${item.sub}</span>
     </li>
+  `).join("");
+
+  return `
+    <section class="card ${cardClass}">
+      <div class="card-header" data-action="${toggleAction}" role="button">
+        <h2 class="card-title">${title}<span class="card-title-fr">${subtitle}</span></h2>
+        <button class="chevron">${open ? "▲" : "▼"}</button>
+      </div>
+      ${open ? `<div class="card-body"><ul class="mobility-list">${rows}</ul></div>` : ""}
+    </section>
   `;
 }
 
+function renderMobilityCard() {
+  return renderChecklistCard({
+    cardClass: "mobility-card", toggleAction: "toggle-mobility-section", checkAction: "toggle-mobility",
+    title: "Routine Mobilité &amp; Souplesse", subtitle: "Échauffement dynamique, identique à chaque séance",
+    items: MOBILITY_ROUTINE, open: uiState.mobilityOpen, checked: uiState.mobilityChecked
+  });
+}
+
+function renderCooldownCard() {
+  return renderChecklistCard({
+    cardClass: "cooldown-card", toggleAction: "toggle-cooldown-section", checkAction: "toggle-cooldown",
+    title: "Retour au calme &amp; étirements", subtitle: "Rouleau, yoga et étirements ciblés pour cette séance",
+    items: COOLDOWN[uiState.day], open: uiState.cooldownOpen, checked: uiState.cooldownChecked
+  });
+}
+
 function renderConditioningCard() {
+  const options = FINISHERS[uiState.day].map((finisher, idx) => `
+    <div class="finisher-option">
+      <span class="finisher-tag">Option ${idx + 1}</span>
+      <p class="finisher-name">${finisher.name}</p>
+      <p class="finisher-fr">${finisher.fr}</p>
+      <p class="finisher-detail">${finisher.detail}</p>
+    </div>
+  `).join("");
+
   return `
     <section class="card conditioning-card">
       <div class="card-header" data-action="toggle-conditioning-section" role="button">
-        <h2 class="card-title">Conditioning<span class="card-title-fr">Finisher, identique à chaque séance</span></h2>
+        <h2 class="card-title">Conditioning<span class="card-title-fr">Finisher : choisis 1 option sur 3</span></h2>
         <button class="chevron">${uiState.conditioningOpen ? "▲" : "▼"}</button>
       </div>
-      ${uiState.conditioningOpen ? `
-        <div class="card-body">
-          <ul class="mobility-list">${renderFinisherItem(CONDITIONING_FINISHER.main)}</ul>
-          <p class="section-label finisher-alt-label">Ou, au choix</p>
-          <ul class="mobility-list">${CONDITIONING_FINISHER.alternatives.map(renderFinisherItem).join("")}</ul>
-        </div>
-      ` : ""}
+      ${uiState.conditioningOpen ? `<div class="card-body finisher-list">${options}</div>` : ""}
     </section>
   `;
 }
@@ -235,7 +240,8 @@ function renderSteppers(exercise, input) {
   return `<div class="stepper-row">${steppers.join("")}</div>`;
 }
 
-function renderExerciseCard(exercise) {
+// tag : repère du duo affiché devant le nom (ex. "1A"), absent pour les exercices de force.
+function renderExerciseCard(exercise, tag = "") {
   const isOpen = uiState.expanded.has(exercise.id);
   const input = getInput(exercise.id, exercise);
   const suggestion = getProgressionSuggestion(exercise, currentPhase);
@@ -248,7 +254,7 @@ function renderExerciseCard(exercise) {
     const hint = renderSuggestionHint(exercise, suggestion, exerciseSub);
     suggestionBox = `
       <div class="suggestion-box">
-        Dernière fois : <strong>${formatSet(exercise, suggestion.last)}</strong> (${suggestion.last.date})
+        Dernière fois : <strong>${formatSet(exercise, suggestion.last)}</strong> (${formatDateFr(suggestion.last.date)})
         ${hint ? `<br/>${hint}` : ""}
       </div>
     `;
@@ -266,7 +272,7 @@ function renderExerciseCard(exercise) {
         ${history.length ? `
           <p class="section-label" style="margin-top:14px;">Historique récent</p>
           <ul class="history-list">
-            ${history.map((h) => `<li><span>${h.date}</span><span>${formatSet(exercise, h)}</span></li>`).join("")}
+            ${history.map((h) => `<li><span>${formatDateFr(h.date)}</span><span>${formatSet(exercise, h)}</span></li>`).join("")}
           </ul>
         ` : ""}
       </div>
@@ -276,7 +282,7 @@ function renderExerciseCard(exercise) {
   return `
     <section class="card exercise-card">
       <div class="card-header" data-action="toggle-exercise" data-id="${exercise.id}" role="button">
-        <h3 class="card-title">${exercise.name}<span class="card-title-fr">${exercise.fr}</span></h3>
+        <h3 class="card-title">${tag ? `<span class="duo-tag">${tag}</span>` : ""}${exercise.name}<span class="card-title-fr">${exercise.fr}</span></h3>
         <span class="card-sub">${exerciseSub}</span>
         <button class="chevron">${isOpen ? "▲" : "▼"}</button>
       </div>
@@ -292,19 +298,67 @@ function renderSeanceView() {
     <button class="day-btn ${day === uiState.day ? "active" : ""}" data-action="set-day" data-day="${day}">${day.toUpperCase()}</button>
   `).join("");
 
-  const powerBlock = exercises.filter((e) => e.category !== "strength");
   const strengthBlock = exercises.filter((e) => e.category === "strength");
   const todayCount = storage.getTodaySets().length;
+
+  // Duos : 3 tours, on enchaîne A puis B sans pause, puis récupération.
+  const duos = Object.keys(DUO_REST).map((n) => {
+    const pair = exercises.filter((e) => String(e.duo) === n);
+    return `
+      <div class="duo-group">
+        <div class="duo-header">
+          <span class="duo-title">Duo ${n}</span>
+          <span class="duo-sub">3 tours : enchaîne ${n}A puis ${n}B sans pause, puis repos ${DUO_REST[n]}</span>
+        </div>
+        ${pair.map((ex, i) => renderExerciseCard(ex, `${n}${"AB"[i]}`)).join("")}
+      </div>
+    `;
+  }).join("");
 
   return `
     <div class="day-selector">${dayButtons}</div>
     ${renderMobilityCard()}
     <p class="section-label" style="margin-top:18px;">Puissance, medball &amp; core</p>
-    ${powerBlock.map(renderExerciseCard).join("")}
+    ${duos}
     <p class="section-label" style="margin-top:18px;">Force</p>
-    ${strengthBlock.map(renderExerciseCard).join("")}
+    ${strengthBlock.map((ex) => renderExerciseCard(ex)).join("")}
     ${renderConditioningCard()}
+    ${renderCooldownCard()}
     <p class="draft-hint">${todayCount} série${todayCount > 1 ? "s" : ""} enregistrée${todayCount > 1 ? "s" : ""} aujourd'hui · sauvegarde automatique</p>
+  `;
+}
+
+const WEEKDAYS_FR = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
+
+// Liste des séances passées, ouverte en touchant le compteur de séances en haut.
+function renderHistorySheet() {
+  if (!uiState.historyOpen) return "";
+  const sessions = storage.getSessions().reverse();
+  const rows = sessions.map((session) => {
+    const weekday = WEEKDAYS_FR[new Date(`${session.date}T12:00:00`).getDay()];
+    const names = [...new Set(session.sets.map((set) => exerciseName(set.exerciseId)))];
+    return `
+      <li class="history-session">
+        <div class="history-session-head">
+          <span class="history-session-date">${weekday} ${formatDateFr(session.date)}</span>
+          <span class="history-session-day">${DAY_LABELS[session.day] || session.day.toUpperCase()}</span>
+        </div>
+        <p class="history-session-detail">${session.sets.length} série${session.sets.length > 1 ? "s" : ""} · ${names.join(", ")}</p>
+      </li>
+    `;
+  }).join("");
+
+  return `
+    <div class="sheet-backdrop" data-action="close-history"></div>
+    <div class="sheet" role="dialog" aria-label="Historique des séances">
+      <div class="sheet-header">
+        <h2 class="sheet-title">${sessions.length} séance${sessions.length > 1 ? "s" : ""}</h2>
+        <button class="sheet-close" data-action="close-history" aria-label="Fermer">✕</button>
+      </div>
+      ${sessions.length
+        ? `<ul class="history-sessions">${rows}</ul>`
+        : `<p class="empty-state">Aucune séance enregistrée pour l'instant.</p>`}
+    </div>
   `;
 }
 
@@ -443,6 +497,7 @@ function render() {
   currentPhase = getCurrentPhase(storage.getFirstSessionDate(), storage.today());
   updateHeader();
   viewContainer.innerHTML = uiState.view === "seance" ? renderSeanceView() : renderProgressionView();
+  historySheet.innerHTML = renderHistorySheet();
   if (uiState.view === "progression") renderChart();
 }
 
@@ -469,11 +524,15 @@ viewContainer.addEventListener("click", (e) => {
   const input = ex ? getInput(ex.id, ex) : null;
 
   if (action === "set-day") {
+    // Les étirements de fin de séance changent avec la séance : on repart d'une liste non cochée.
+    if (uiState.day !== target.dataset.day) uiState.cooldownChecked.clear();
     uiState.day = target.dataset.day;
   } else if (action === "toggle-mobility-section") {
     uiState.mobilityOpen = !uiState.mobilityOpen;
   } else if (action === "toggle-conditioning-section") {
     uiState.conditioningOpen = !uiState.conditioningOpen;
+  } else if (action === "toggle-cooldown-section") {
+    uiState.cooldownOpen = !uiState.cooldownOpen;
   } else if (action === "toggle-exercise") {
     if (uiState.expanded.has(ex.id)) uiState.expanded.delete(ex.id);
     else uiState.expanded.add(ex.id);
@@ -497,10 +556,11 @@ viewContainer.addEventListener("click", (e) => {
 viewContainer.addEventListener("change", (e) => {
   const target = e.target;
   const ex = target.dataset.id ? findExercise(target.dataset.id) : null;
-  if (target.dataset.action === "toggle-mobility") {
+  if (target.dataset.action === "toggle-mobility" || target.dataset.action === "toggle-cooldown") {
+    const checked = target.dataset.action === "toggle-mobility" ? uiState.mobilityChecked : uiState.cooldownChecked;
     const idx = parseInt(target.dataset.idx, 10);
-    if (target.checked) uiState.mobilityChecked.add(idx);
-    else uiState.mobilityChecked.delete(idx);
+    if (target.checked) checked.add(idx);
+    else checked.delete(idx);
     target.closest(".mobility-item").classList.toggle("checked", target.checked);
   } else if (target.dataset.role === "weight-input") {
     // Une saisie libre est ramenée au poids standard le plus proche (ex. 52 → 50 lb).
@@ -517,6 +577,17 @@ viewContainer.addEventListener("change", (e) => {
   } else if (target.id === "import-file" && target.files.length) {
     importBackup(target.files[0]);
   }
+});
+
+sessionBadge.addEventListener("click", () => {
+  uiState.historyOpen = true;
+  render();
+});
+
+historySheet.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-action=\"close-history\"]")) return;
+  uiState.historyOpen = false;
+  render();
 });
 
 bottomNav.addEventListener("click", (e) => {
