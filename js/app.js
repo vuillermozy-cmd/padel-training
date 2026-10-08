@@ -1,4 +1,4 @@
-import { MOBILITY_ROUTINE, FINISHERS, COOLDOWN, DUO_REST, SESSIONS, findExercise, exerciseName } from "./data.js";
+import { MOBILITY_ROUTINE, ROUTINE_MEDIA, FINISHERS, COOLDOWN, DUO_REST, SESSIONS, findExercise, exerciseName } from "./data.js";
 import * as storage from "./storage.js";
 import { getProgressionSuggestion } from "./progression.js";
 import { getCurrentPhase, getStrengthSub } from "./periodization.js";
@@ -12,12 +12,46 @@ function getExercisePhotoFrames(exerciseId) {
   return [`img/exercises/${exerciseId}/0.jpg`, `img/exercises/${exerciseId}/1.jpg`];
 }
 
+// Avec deux images différentes, elles alternent automatiquement (voir setInterval ci-dessous).
+function renderPhotoFrames(frame0, frame1, alt) {
+  return `
+    <div class="exercise-photo-wrap">
+      <img class="exercise-photo" src="${frame0}" data-frame0="${frame0}" data-frame1="${frame1}" data-current="0" alt="Démonstration : ${alt}" />
+    </div>
+  `;
+}
+
 function renderExercisePhoto(exercise) {
   if (exercise.noPhoto) return "";
   const [frame0, frame1] = getExercisePhotoFrames(exercise.id);
+  return renderPhotoFrames(frame0, frame1, exercise.name);
+}
+
+function youtubeLink(query) {
+  return `<a class="yt-link" href="https://www.youtube.com/results?search_query=${encodeURIComponent(query)}" target="_blank" rel="noopener noreferrer">▶ Voir une démo vidéo</a>`;
+}
+
+// Bouton "Démo" d'un élément de routine (mobilité, conditioning, étirements).
+function renderMediaToggle(key) {
+  const open = uiState.openMedia.has(key);
+  return `<button class="media-toggle ${open ? "open" : ""}" data-action="toggle-media" data-key="${key}">${open ? "Masquer" : "Démo"}</button>`;
+}
+
+// Photos dépliées d'un élément de routine, avec leurs crédits, puis le lien vidéo.
+function renderRoutineMedia(item, key) {
+  if (!uiState.openMedia.has(key)) return "";
+  const photos = item.media.map((id) => {
+    const media = ROUTINE_MEDIA[id];
+    const frame0 = `img/routine/${id}/0.jpg`;
+    const frame1 = media.frames === 2 ? `img/routine/${id}/1.jpg` : frame0;
+    return renderPhotoFrames(frame0, frame1, item.name)
+      + (media.note ? `<p class="photo-note">${media.note}</p>` : "")
+      + (media.credit ? `<p class="photo-credit">Photo : <a href="${media.credit.url}" target="_blank" rel="noopener noreferrer">${media.credit.author}</a>, ${media.credit.license}, Wikimedia Commons</p>` : "");
+  }).join("");
   return `
-    <div class="exercise-photo-wrap">
-      <img class="exercise-photo" src="${frame0}" data-frame0="${frame0}" data-frame1="${frame1}" data-current="0" alt="Démonstration : ${exercise.name}" />
+    <div class="routine-media">
+      ${photos || `<p class="photo-note">Pas de photo libre de droits pour ce mouvement : regarde la vidéo.</p>`}
+      ${youtubeLink(item.yt)}
     </div>
   `;
 }
@@ -49,6 +83,7 @@ const uiState = {
   cooldownOpen: false,
   cooldownChecked: new Set(),
   historyOpen: false,
+  openMedia: new Set(), // clés des éléments de routine dont la démo est dépliée
   inputs: {}, // exerciseId -> { weightLb, reps, distanceM } (selon la mesure de l'exercice)
   progressionExerciseId: null,
   backupMessage: ""
@@ -122,15 +157,19 @@ function updateHeader() {
 }
 
 // Carte repliable avec une liste à cocher (routine mobilité, retour au calme).
-function renderChecklistCard({ cardClass, toggleAction, checkAction, title, subtitle, items, open, checked }) {
+function renderChecklistCard({ cardClass, toggleAction, checkAction, mediaPrefix, title, subtitle, items, open, checked }) {
   const rows = items.map((item, idx) => `
-    <li class="mobility-item ${checked.has(idx) ? "checked" : ""}">
-      <input type="checkbox" data-action="${checkAction}" data-idx="${idx}" ${checked.has(idx) ? "checked" : ""} />
-      <span class="mobility-item-text">
-        <span class="mobility-item-name">${item.name}</span><br/>
-        <span class="mobility-item-fr">${item.fr}</span>
-      </span>
-      <span class="mobility-item-sub">${item.sub}</span>
+    <li class="mobility-row">
+      <div class="mobility-item ${checked.has(idx) ? "checked" : ""}">
+        <input type="checkbox" data-action="${checkAction}" data-idx="${idx}" ${checked.has(idx) ? "checked" : ""} />
+        <span class="mobility-item-text">
+          <span class="mobility-item-name">${item.name}</span><br/>
+          <span class="mobility-item-fr">${item.fr}</span>
+        </span>
+        <span class="mobility-item-sub">${item.sub}</span>
+        ${renderMediaToggle(`${mediaPrefix}-${idx}`)}
+      </div>
+      ${renderRoutineMedia(item, `${mediaPrefix}-${idx}`)}
     </li>
   `).join("");
 
@@ -147,7 +186,7 @@ function renderChecklistCard({ cardClass, toggleAction, checkAction, title, subt
 
 function renderMobilityCard() {
   return renderChecklistCard({
-    cardClass: "mobility-card", toggleAction: "toggle-mobility-section", checkAction: "toggle-mobility",
+    cardClass: "mobility-card", toggleAction: "toggle-mobility-section", checkAction: "toggle-mobility", mediaPrefix: "mobility",
     title: "Routine Mobilité &amp; Souplesse", subtitle: "Échauffement dynamique, identique à chaque séance",
     items: MOBILITY_ROUTINE, open: uiState.mobilityOpen, checked: uiState.mobilityChecked
   });
@@ -155,7 +194,7 @@ function renderMobilityCard() {
 
 function renderCooldownCard() {
   return renderChecklistCard({
-    cardClass: "cooldown-card", toggleAction: "toggle-cooldown-section", checkAction: "toggle-cooldown",
+    cardClass: "cooldown-card", toggleAction: "toggle-cooldown-section", checkAction: "toggle-cooldown", mediaPrefix: `cooldown-${uiState.day}`,
     title: "Retour au calme &amp; étirements", subtitle: "Rouleau, yoga et étirements ciblés pour cette séance",
     items: COOLDOWN[uiState.day], open: uiState.cooldownOpen, checked: uiState.cooldownChecked
   });
@@ -168,6 +207,8 @@ function renderConditioningCard() {
       <p class="finisher-name">${finisher.name}</p>
       <p class="finisher-fr">${finisher.fr}</p>
       <p class="finisher-detail">${finisher.detail}</p>
+      ${renderMediaToggle(`finisher-${uiState.day}-${idx}`)}
+      ${renderRoutineMedia(finisher, `finisher-${uiState.day}-${idx}`)}
     </div>
   `).join("");
 
@@ -246,7 +287,6 @@ function renderExerciseCard(exercise, tag = "") {
   const input = getInput(exercise.id, exercise);
   const suggestion = getProgressionSuggestion(exercise, currentPhase);
   const history = storage.getSetsForExercise(exercise.id).slice(-5).reverse();
-  const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(exercise.yt)}`;
   const exerciseSub = getExerciseSub(exercise);
 
   let suggestionBox = `<div class="suggestion-box">Aucune donnée encore — entre ta première série ci-dessous.</div>`;
@@ -264,7 +304,7 @@ function renderExerciseCard(exercise, tag = "") {
     ? `
       <div class="card-body">
         ${renderExercisePhoto(exercise)}
-        <a class="yt-link" href="${ytUrl}" target="_blank" rel="noopener noreferrer">▶ Voir une démo vidéo</a>
+        ${youtubeLink(exercise.yt)}
         ${suggestionBox}
         ${renderSteppers(exercise, input)}
         <button class="btn btn-primary" data-action="save-set" data-id="${exercise.id}">Enregistrer cette série</button>
@@ -533,6 +573,10 @@ viewContainer.addEventListener("click", (e) => {
     uiState.conditioningOpen = !uiState.conditioningOpen;
   } else if (action === "toggle-cooldown-section") {
     uiState.cooldownOpen = !uiState.cooldownOpen;
+  } else if (action === "toggle-media") {
+    const key = target.dataset.key;
+    if (uiState.openMedia.has(key)) uiState.openMedia.delete(key);
+    else uiState.openMedia.add(key);
   } else if (action === "toggle-exercise") {
     if (uiState.expanded.has(ex.id)) uiState.expanded.delete(ex.id);
     else uiState.expanded.add(ex.id);

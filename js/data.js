@@ -12,15 +12,39 @@
 //   "carry" → poids + distance en mètres (portés)
 // "perDumbbell" : le poids noté est celui d'un haltère (exercice fait avec un haltère dans chaque main).
 
+// Photos de démonstration des routines (mobilité, conditioning, étirements), dans img/routine/<id>/.
+// frames : 2 = position de départ / position finale en alternance (free-exercise-db, domaine public),
+// 1 = photo unique (Wikimedia Commons, à créditer). note : précision affichée sous la photo.
+const COMMONS = "https://commons.wikimedia.org/wiki/File:";
+export const ROUTINE_MEDIA = {
+  "childs-pose": { frames: 2 },
+  "downward-dog": { frames: 1, credit: { author: "Iveto", license: "CC BY 3.0", url: COMMONS + "Downward-Facing-Dog.JPG" } },
+  "worlds-greatest-stretch": { frames: 2 },
+  "lateral-lunge": { frames: 2, note: "Photo avec une barre : à l'échauffement, fais-la au poids du corps." },
+  "band-pull-apart": { frames: 2 },
+  "foam-roller": { frames: 2, note: "Ici sur les quadriceps : même principe pour mollets, ischios et dos." },
+  "seated-hamstring-stretch": { frames: 2 },
+  "lizard-pose": { frames: 1, credit: { author: "Rafael Montilla", license: "CC BY-SA 2.0", url: COMMONS + "Yoga_class_in_Lizard_pose.jpg" } },
+  "cross-body-shoulder-stretch": { frames: 2 },
+  "cobra": { frames: 1, credit: { author: "Kennguru", license: "CC BY 3.0", url: COMMONS + "Bhujangasana_Yoga-Asana_Nina-Mel.jpg" } },
+  "sled-push": { frames: 2 },
+  "assault-bike": { frames: 1, credit: { author: "HybridFitty", license: "CC BY 4.0", url: COMMONS + "Assault_Bike_Spartan_Games_2.jpg" } },
+  "rower": { frames: 2 },
+  "swing": { frames: 2 },
+  "burpee": { frames: 2, credit: { author: "Taco fleur", license: "CC BY-SA 4.0", url: COMMONS + "Burpee_5_Thrust.jpg" } },
+  "mountain-climbers": { frames: 2 }
+};
+
 // Routine d'échauffement, identique à chaque séance : uniquement du dynamique, sans mur ni matériel lourd.
+// media : photos de ROUTINE_MEDIA ; yt : recherche YouTube pour la démo vidéo.
 export const MOBILITY_ROUTINE = [
-  { name: "Child's pose", fr: "posture de l'enfant", sub: "2 x 30s" },
-  { name: "Downward dog", fr: "chien tête en bas", sub: "2 x 30s" },
-  { name: "World's greatest stretch", fr: "étirement dynamique complet", sub: "2 x 5/côté" },
-  { name: "Cossack squat", fr: "squat latéral profond, d'un côté à l'autre", sub: "2 x 6/côté" },
-  { name: "90/90 hip switches", fr: "90-90 hanches (balai)", sub: "2 x 8/côté" },
-  { name: "Band shoulder rotations", fr: "rotations d'épaule à l'élastique", sub: "2 x 15" },
-  { name: "Band pull-aparts", fr: "écartés d'élastique, omoplates serrées", sub: "2 x 15" }
+  { name: "Child's pose", fr: "posture de l'enfant", sub: "2 x 30s", media: ["childs-pose"], yt: "child's pose yoga" },
+  { name: "Downward dog", fr: "chien tête en bas", sub: "2 x 30s", media: ["downward-dog"], yt: "downward dog yoga pose" },
+  { name: "World's greatest stretch", fr: "étirement dynamique complet", sub: "2 x 5/côté", media: ["worlds-greatest-stretch"], yt: "world's greatest stretch" },
+  { name: "Lateral lunge", fr: "fente latérale, jambe opposée tendue", sub: "2 x 6/côté", media: ["lateral-lunge"], yt: "bodyweight lateral lunge" },
+  { name: "90/90 hip switches", fr: "90-90 hanches (balai)", sub: "2 x 8/côté", media: [], yt: "90 90 hip switches" },
+  { name: "Band shoulder rotations", fr: "rotations d'épaule à l'élastique", sub: "2 x 15", media: [], yt: "band shoulder dislocates" },
+  { name: "Band pull-aparts", fr: "écartés d'élastique, omoplates serrées", sub: "2 x 15", media: ["band-pull-apart"], yt: "band pull apart" }
 ];
 
 // Duos de la section Puissance, medball & core : 3 tours, on enchaîne les deux exercices puis on récupère.
@@ -76,46 +100,48 @@ export const SESSIONS = {
 // 3 finishers au choix par séance (pas de corde à sauter à la salle).
 export const FINISHERS = {
   a: [
-    { name: "Sled push + agility ladder", fr: "poussée de traîneau + échelle d'agilité", detail: "5 tours : 20 m de sled + 2 passages d'échelle. Récup 60-90s entre les tours." },
-    { name: "Assault bike sprints", fr: "sprints courts haute intensité", detail: "8 x 15s à fond, 45s de pédalage léger entre chaque." },
-    { name: "Navettes 5-10-5", fr: "changements de direction façon padel", detail: "6 navettes : 5 m à droite, 10 m à gauche, 5 m retour, en touchant le sol. Récup 45s." }
+    { name: "Sled push + agility ladder", fr: "poussée de traîneau + échelle d'agilité", detail: "5 tours : 20 m de sled + 2 passages d'échelle. Récup 60-90s entre les tours.", media: ["sled-push"], yt: "agility ladder drills" },
+    { name: "Assault bike sprints", fr: "sprints courts haute intensité", detail: "8 x 15s à fond, 45s de pédalage léger entre chaque.", media: ["assault-bike"], yt: "assault bike sprint intervals" },
+    { name: "Navettes 5-10-5", fr: "changements de direction façon padel", detail: "6 navettes : 5 m à droite, 10 m à gauche, 5 m retour, en touchant le sol. Récup 45s.", media: [], yt: "5-10-5 pro agility drill" }
   ],
   b: [
-    { name: "Rameur 250 m", fr: "intervalles au rameur", detail: "5 x 250 m à fond. Récup 1 min entre chaque." },
-    { name: "Swings + burpees (EMOM 8 min)", fr: "kettlebell ou haltère, une tâche par minute", detail: "Minutes impaires : 15 swings. Minutes paires : 8 burpees. Le reste de la minute = récup." },
-    { name: "Échelle d'agilité + pas chassés", fr: "appuis rapides et déplacements latéraux", detail: "6 tours : 1 passage d'échelle + 10 m de pas chassés aller-retour. Récup 45s." }
+    { name: "Rameur 250 m", fr: "intervalles au rameur", detail: "5 x 250 m à fond. Récup 1 min entre chaque.", media: ["rower"], yt: "rowing machine technique" },
+    { name: "Swings + burpees (EMOM 8 min)", fr: "kettlebell ou haltère, une tâche par minute", detail: "Minutes impaires : 15 swings. Minutes paires : 8 burpees. Le reste de la minute = récup.", media: ["swing", "burpee"], yt: "kettlebell swing technique" },
+    { name: "Échelle d'agilité + pas chassés", fr: "appuis rapides et déplacements latéraux", detail: "6 tours : 1 passage d'échelle + 10 m de pas chassés aller-retour. Récup 45s.", media: [], yt: "agility ladder lateral shuffle drill" }
   ],
   c: [
-    { name: "Sled push lourd", fr: "poussée de traîneau chargée", detail: "6 x 15 m, aussi lourd que possible en restant rapide. Récup 60s." },
-    { name: "Assault bike Tabata", fr: "intervalles très courts", detail: "8 x 20s à fond / 10s de récup (4 min). Puis 2 min de pédalage léger." },
-    { name: "Burpees + mountain climbers", fr: "circuit poids du corps, sans matériel", detail: "5 tours : 10 burpees + 20 mountain climbers. Récup 45s." }
+    { name: "Sled push lourd", fr: "poussée de traîneau chargée", detail: "6 x 15 m, aussi lourd que possible en restant rapide. Récup 60s.", media: ["sled-push"], yt: "heavy sled push technique" },
+    { name: "Assault bike Tabata", fr: "intervalles très courts", detail: "8 x 20s à fond / 10s de récup (4 min). Puis 2 min de pédalage léger.", media: ["assault-bike"], yt: "assault bike tabata" },
+    { name: "Burpees + mountain climbers", fr: "circuit poids du corps, sans matériel", detail: "5 tours : 10 burpees + 20 mountain climbers. Récup 45s.", media: ["burpee", "mountain-climbers"], yt: "burpee proper form" }
   ]
 };
 
 // Retour au calme : rouleau puis étirements statiques et yoga ciblés sur les muscles travaillés dans la séance.
-const FOAM_ROLLER = { name: "Foam roller", fr: "rouleau : mollets, quadriceps, ischios, dos", sub: "5 min" };
+const FOAM_ROLLER = { name: "Foam roller", fr: "rouleau : mollets, quadriceps, ischios, dos", sub: "5 min", media: ["foam-roller"], yt: "foam roller full body routine" };
+const PIGEON = { name: "Pigeon pose", fr: "posture du pigeon (yoga), fessiers et hanches", sub: "45s/côté", media: [], yt: "pigeon pose stretch beginner" };
+const THREAD_THE_NEEDLE = { name: "Thread the needle", fr: "rotation thoracique au sol (yoga), haut du dos", sub: "30s/côté", media: [], yt: "thread the needle stretch" };
 
 export const COOLDOWN = {
   a: [
     FOAM_ROLLER,
-    { name: "Pigeon pose", fr: "posture du pigeon (yoga), fessiers et hanches", sub: "45s/côté" },
-    { name: "Thread the needle", fr: "rotation thoracique au sol (yoga), haut du dos", sub: "30s/côté" },
-    { name: "Kneeling lat stretch", fr: "à genoux, coudes sur un banc, dorsaux", sub: "2 x 30s" },
-    { name: "Floor chest opener", fr: "allongé sur le ventre, bras en T, pectoraux", sub: "30s/côté" }
+    PIGEON,
+    THREAD_THE_NEEDLE,
+    { name: "Kneeling lat stretch", fr: "à genoux, coudes sur un banc, dorsaux", sub: "2 x 30s", media: [], yt: "kneeling lat stretch bench" },
+    { name: "Floor chest opener", fr: "allongé sur le ventre, bras en T, pectoraux", sub: "30s/côté", media: [], yt: "prone chest opener stretch" }
   ],
   b: [
     FOAM_ROLLER,
-    { name: "Seated forward fold", fr: "pince assise (yoga), ischios et bas du dos", sub: "2 x 45s" },
-    { name: "Lizard pose", fr: "posture du lézard (yoga), fléchisseurs de hanche", sub: "45s/côté" },
-    { name: "Child's pose side reach", fr: "posture de l'enfant bras sur le côté, dorsaux", sub: "30s/côté" },
-    { name: "Cross-body shoulder stretch", fr: "bras tendu devant la poitrine, épaules", sub: "30s/côté" }
+    { name: "Seated hamstring stretch", fr: "assis, une jambe tendue, ischios et bas du dos", sub: "45s/côté", media: ["seated-hamstring-stretch"], yt: "seated hamstring stretch" },
+    { name: "Lizard pose", fr: "posture du lézard (yoga), fléchisseurs de hanche", sub: "45s/côté", media: ["lizard-pose"], yt: "lizard pose yoga" },
+    { name: "Child's pose side reach", fr: "posture de l'enfant bras sur le côté, dorsaux", sub: "30s/côté", media: [], yt: "child's pose side stretch" },
+    { name: "Cross-body shoulder stretch", fr: "bras tendu devant la poitrine, épaules", sub: "30s/côté", media: ["cross-body-shoulder-stretch"], yt: "cross body shoulder stretch" }
   ],
   c: [
     FOAM_ROLLER,
-    { name: "Couch stretch", fr: "genou au sol, pied sur un banc, quadriceps et psoas", sub: "45s/côté" },
-    { name: "Pigeon pose", fr: "posture du pigeon (yoga), fessiers et hanches", sub: "45s/côté" },
-    { name: "Cobra", fr: "cobra (yoga), abdos et ouverture de la poitrine", sub: "2 x 30s" },
-    { name: "Thread the needle", fr: "rotation thoracique au sol (yoga), haut du dos", sub: "30s/côté" }
+    { name: "Couch stretch", fr: "genou au sol, pied sur un banc, quadriceps et psoas", sub: "45s/côté", media: [], yt: "couch stretch" },
+    PIGEON,
+    { name: "Cobra", fr: "cobra (yoga), abdos et ouverture de la poitrine", sub: "2 x 30s", media: ["cobra"], yt: "cobra pose yoga" },
+    THREAD_THE_NEEDLE
   ]
 };
 

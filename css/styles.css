@@ -420,16 +420,70 @@ button {
   padding: 0;
 }
 
+.mobility-row {
+  border-bottom: 1px solid var(--line);
+}
+
+.mobility-row:last-child {
+  border-bottom: none;
+}
+
 .mobility-item {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--line);
 }
 
-.mobility-item:last-child {
-  border-bottom: none;
+/* Bouton "Démo" et photos dépliées sous un élément de routine */
+
+.media-toggle {
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  background: var(--white);
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.media-toggle.open {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--white);
+}
+
+.routine-media {
+  padding: 0 0 12px;
+}
+
+.routine-media .exercise-photo-wrap {
+  margin: 0 0 8px;
+}
+
+.photo-note,
+.photo-credit {
+  margin: -2px 0 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.photo-credit a {
+  color: inherit;
+}
+
+.routine-media .yt-link {
+  margin-bottom: 0;
+}
+
+.finisher-option .media-toggle {
+  margin-top: 8px;
+}
+
+.finisher-option .routine-media {
+  padding: 10px 0 0;
 }
 
 .mobility-item input[type="checkbox"] {
