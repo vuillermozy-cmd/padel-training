@@ -2,7 +2,8 @@
 //
 // Chaque appareil garde ses données en local (storage.js) et les fusionne avec le fichier du Gist :
 // on relit toujours le Gist avant d'écrire, et la fusion ne fait qu'ajouter des séries (sans doublons),
-// donc un appareil ne peut pas effacer les séances d'un autre. La clé GitHub (droit "gist" uniquement)
+// donc un appareil ne peut pas effacer les séances d'un autre. Les préférences ("plus jamais") voyagent
+// dans le même fichier : la version la plus récente gagne. La clé GitHub (droit "gist" uniquement)
 // reste dans ce navigateur et n'est envoyée qu'à api.github.com.
 
 import * as storage from "./storage.js";
@@ -82,27 +83,31 @@ async function github(path, { method = "GET", body, token = config.token } = {})
   return response.json();
 }
 
-// Contenu du fichier de synchro dans le Gist (lu via raw_url s'il est trop gros pour être inclus).
-async function readRemoteSets() {
+// Contenu brut du fichier de synchro dans le Gist (lu via raw_url s'il est trop gros pour être inclus).
+async function readRemote() {
   const gist = await github(`/gists/${config.gistId}`);
   const file = gist.files[FILE_NAME];
-  if (!file) return [];
+  if (!file) return "";
   let content = file.content;
   if (file.truncated) {
     const raw = await fetch(file.raw_url, { cache: "no-store" });
     content = await raw.text();
   }
-  return content ? storage.parseSets(content) : [];
+  return content || "";
 }
 
 // Fusionne le Gist dans les données locales, puis y écrit les séries locales qu'il n'a pas encore.
 async function runSync() {
   setStatus({ state: "syncing", message: "" });
-  const remote = await readRemoteSets();
+  const content = await readRemote();
+  const remote = content ? storage.parseSets(content) : [];
+  const remotePrefs = content ? storage.parsePrefs(content) : null;
   const pulled = storage.mergeSets(remote, { silent: true });
+  storage.mergePrefs(remotePrefs, { silent: true });
   const remoteKeys = new Set(remote.map(storage.setKey));
   const missingRemotely = storage.getAllSets().some((set) => !remoteKeys.has(storage.setKey(set)));
-  if (missingRemotely) {
+  const prefsNewerLocally = storage.getPrefs().updatedAt > (remotePrefs ? remotePrefs.updatedAt : 0);
+  if (missingRemotely || prefsNewerLocally) {
     await github(`/gists/${config.gistId}`, { method: "PATCH", body: { files: { [FILE_NAME]: { content: storage.exportData() } } } });
   }
   setStatus({ state: "ok", message: "", lastSync: Date.now() });

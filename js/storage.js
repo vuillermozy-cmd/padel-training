@@ -1,6 +1,7 @@
 // Persistance locale (localStorage) — aucune donnée ne quitte l'appareil.
 //
-// Chaque série est enregistrée immédiatement et définitivement, avec sa date et sa séance (A/B/C).
+// Chaque série est enregistrée immédiatement et définitivement, avec sa date. Les séries des anciennes
+// versions gardent leur champ "day" (séance A/B/C) ; les nouvelles n'en ont plus (séance composée à la volée).
 // Une séance = un jour d'entraînement : le compteur et l'historique se déduisent des séries,
 // il n'y a plus de "séance en cours" à terminer (et donc plus rien qui puisse être perdu en route).
 
@@ -8,7 +9,10 @@ import { LB_PER_KG } from "./weights.js";
 
 const STORAGE_KEY = "padel-training-data-v1";
 const BACKUP_KEY = "padel-training-data-v1-backup";
-const ROTATION = ["a", "b", "c"];
+// Préférences synchronisées entre appareils : { excluded: [ids "plus jamais"], updatedAt }.
+const PREFS_KEY = "padel-training-prefs";
+// Plan du jour (exercices proposés, refusés, gardés), propre à cet appareil (voir planner.js).
+const PLAN_KEY = "padel-training-plan";
 
 // Date locale (et non UTC) : une séance du soir reste datée du bon jour.
 function localDate(timestamp) {
@@ -88,9 +92,9 @@ if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.p
 
 // Enregistre une série (fiche exercice → "Enregistrer cette série").
 // values : les champs de la mesure de l'exercice, parmi { weightLb, reps, distanceM }.
-export function logSet(exerciseId, day, values) {
+export function logSet(exerciseId, values) {
   const timestamp = Date.now();
-  const entry = { exerciseId, day, date: localDate(timestamp), timestamp, ...values };
+  const entry = { exerciseId, date: localDate(timestamp), timestamp, ...values };
   state.sets.push(entry);
   save();
   notifyChange();
@@ -111,7 +115,8 @@ export function getLastSetForExercise(exerciseId) {
   return sets.length ? sets[sets.length - 1] : null;
 }
 
-// Séances = jours d'entraînement, du plus ancien au plus récent : [{ date, day, sets }].
+// Séances = jours d'entraînement, du plus ancien au plus récent : [{ date, day, sets }]
+// (day : "a", "b" ou "c" pour les séances des anciennes versions, absent ensuite).
 export function getSessions() {
   const byDate = new Map();
   getAllSets().forEach((set) => {
@@ -139,18 +144,86 @@ export function hasTrainedToday() {
   return getTodaySets().length > 0;
 }
 
-// Séance du jour si tu t'entraînes déjà aujourd'hui, sinon la suivante dans la rotation A → B → C.
-export function getSuggestedNextDay() {
-  const sessions = getSessions();
-  if (!sessions.length) return ROTATION[0];
-  const last = sessions[sessions.length - 1];
-  if (last.date === today()) return last.day;
-  return ROTATION[(ROTATION.indexOf(last.day) + 1) % ROTATION.length];
+// Séries des jours précédents (pour composer la séance du jour sans que l'ordre bouge en cours de séance).
+export function getSetsBeforeToday() {
+  const date = today();
+  return getAllSets().filter((set) => set.date < date);
 }
 
-// Sauvegarde : fichier JSON avec toutes les séries, à garder hors du navigateur.
+// Nombre de séances avant aujourd'hui.
+export function getSessionsBeforeToday() {
+  const date = today();
+  return getSessions().filter((s) => s.date < date).length;
+}
+
+// ── Préférences ("plus jamais"), fusionnées entre appareils : la version la plus récente gagne.
+
+function loadPrefs() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PREFS_KEY));
+    if (parsed && Array.isArray(parsed.excluded)) return { excluded: parsed.excluded, updatedAt: parsed.updatedAt || 0 };
+  } catch (e) { /* préférences illisibles : on repart des valeurs par défaut */ }
+  return { excluded: [], updatedAt: 0 };
+}
+
+let prefs = loadPrefs();
+
+function savePrefs() {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+}
+
+export function getPrefs() {
+  return { excluded: [...prefs.excluded], updatedAt: prefs.updatedAt };
+}
+
+export function getExcluded() {
+  return new Set(prefs.excluded);
+}
+
+export function setExcluded(id, isExcluded) {
+  const next = new Set(prefs.excluded);
+  if (isExcluded) next.add(id);
+  else next.delete(id);
+  prefs = { excluded: [...next], updatedAt: Date.now() };
+  savePrefs();
+  notifyChange();
+}
+
+// Lit les préférences d'un fichier de sauvegarde ou de synchro (null si absentes).
+export function parsePrefs(json) {
+  const parsed = JSON.parse(json);
+  const p = parsed && parsed.prefs;
+  return p && Array.isArray(p.excluded) ? { excluded: p.excluded, updatedAt: p.updatedAt || 0 } : null;
+}
+
+// Garde les préférences les plus récentes. Retourne true si celles reçues ont remplacé les locales.
+export function mergePrefs(incoming, { silent = false } = {}) {
+  if (!incoming || incoming.updatedAt <= prefs.updatedAt) return false;
+  prefs = { excluded: [...incoming.excluded], updatedAt: incoming.updatedAt };
+  savePrefs();
+  if (!silent) notifyChange();
+  return true;
+}
+
+// ── Plan du jour (local à l'appareil)
+
+export function loadPlan() {
+  try {
+    return JSON.parse(localStorage.getItem(PLAN_KEY));
+  } catch (e) {
+    return null;
+  }
+}
+
+export function savePlan(plan) {
+  try {
+    localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
+  } catch (e) { /* plan non sauvegardé : il sera recomposé au prochain chargement */ }
+}
+
+// Sauvegarde : fichier JSON avec toutes les séries et les préférences, à garder hors du navigateur.
 export function exportData() {
-  return JSON.stringify({ app: "padel-training", exportedAt: new Date().toISOString(), ...state }, null, 2);
+  return JSON.stringify({ app: "padel-training", exportedAt: new Date().toISOString(), ...state, prefs }, null, 2);
 }
 
 // Une série est identifiée par son exercice et l'instant où elle a été enregistrée.
@@ -178,5 +251,6 @@ export function mergeSets(incoming, { silent = false } = {}) {
 
 // Restauration d'un fichier de sauvegarde. Retourne le nombre de séries ajoutées.
 export function importData(json) {
+  mergePrefs(parsePrefs(json));
   return mergeSets(parseSets(json));
 }

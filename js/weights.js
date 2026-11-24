@@ -3,15 +3,18 @@
 
 export const LB_PER_KG = 2.2046226218;
 
-// Cran des poulies/machines de la salle (lat pulldown, pallof press). À ajuster si besoin.
+// Cran des poulies de la salle (lat pulldown, pallof press, tirage). À ajuster si besoin.
 export const CABLE_STEP_LB = 5;
+
+// Machines chargées avec des disques (presse à cuisses) : 2 disques de 5 lb, un de chaque côté.
+export const MACHINE_STEP_LB = 10;
 
 // Medecine balls (2 lb d'écart) et slam balls (5 lb d'écart).
 const MEDBALL_WEIGHTS_LB = [4, 6, 8, 10, 12, 14, 15, 16, 18, 20, 25, 30];
 
-const STEP_LB = { barbell: 5, dumbbell: 5, cable: CABLE_STEP_LB };
+const STEP_LB = { barbell: 5, dumbbell: 5, cable: CABLE_STEP_LB, machine: MACHINE_STEP_LB };
 
-export const DEFAULT_WEIGHT_LB = { barbell: 45, dumbbell: 20, cable: 30, medball: 10 };
+export const DEFAULT_WEIGHT_LB = { barbell: 45, dumbbell: 20, cable: 30, machine: 90, medball: 10 };
 
 export function lbToKg(lb) {
   return lb / LB_PER_KG;

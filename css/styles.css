@@ -118,31 +118,6 @@ button {
   margin: 0 auto;
 }
 
-/* Day selector */
-
-.day-selector {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.day-btn {
-  flex: 1;
-  border: 1px solid var(--line);
-  background: var(--white);
-  border-radius: var(--radius);
-  padding: 12px 0;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.day-btn.active {
-  background: var(--green);
-  border-color: var(--green);
-  color: var(--white);
-}
-
 /* Cards */
 
 .card {
@@ -175,148 +150,269 @@ button {
   margin-top: 2px;
 }
 
-.card-sub {
-  font-size: 0.82rem;
-  color: var(--terracotta-dark);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 .card-body {
   padding: 0 16px 16px;
   border-top: 1px solid var(--line);
   padding-top: 14px;
 }
 
-.chevron {
-  border: none;
-  background: none;
-  font-size: 1.1rem;
-  color: var(--text-muted);
-  padding: 4px 8px;
+/* Séance : une carte plein écran par étape */
+
+.step-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: -4px -16px 12px;
+  padding: 0 16px 4px;
+  scrollbar-width: none;
 }
 
-.card-header[data-action] {
+.step-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.step-chip {
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  background: var(--white);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
-/* Mobility checklist */
+.step-chip.done {
+  color: var(--green);
+  border-color: var(--green);
+}
 
-.mobility-card .card-header {
+.step-chip.active {
   background: var(--green);
-}
-
-.mobility-card .card-title,
-.mobility-card .card-title-fr {
+  border-color: var(--green);
   color: var(--white);
 }
 
-.mobility-card .chevron {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-/* Conditioning finisher (même structure que la routine mobilité, couleur terracotta) */
-
-.conditioning-card {
-  margin-top: 18px;
-}
-
-.conditioning-card .card-header {
-  background: var(--terracotta);
-}
-
-.conditioning-card .card-title,
-.conditioning-card .card-title-fr {
-  color: var(--white);
-}
-
-.conditioning-card .chevron {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-/* Options de finisher : texte empilé sur toute la largeur */
-
-.finisher-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.finisher-option {
+.step-card {
+  background: var(--white);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--terracotta);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 18px;
+  padding: 18px 16px 16px;
+  min-height: calc(100vh - 260px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  position: relative;
 }
 
-.finisher-tag {
-  font-size: 0.7rem;
+/* Le geste horizontal est géré par l'app, le vertical reste le défilement de la page. */
+.step-card[data-swipe="1"] {
+  touch-action: pan-y;
+}
+
+.step-card[data-dir="left"] {
+  box-shadow: inset 0 0 0 3px var(--terracotta);
+}
+
+.step-card[data-dir="right"] {
+  box-shadow: inset 0 0 0 3px var(--green);
+}
+
+.step-kicker {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--terracotta-dark);
 }
 
-.finisher-name {
-  margin: 2px 0 0;
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-
-.finisher-fr {
-  margin: 2px 0 0;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-.finisher-detail {
-  margin: 6px 0 0;
+.step-intro {
+  margin: 0 0 12px;
   font-size: 0.85rem;
+  color: var(--text-muted);
   line-height: 1.4;
 }
 
-/* Retour au calme (même structure que la routine mobilité) */
-
-.cooldown-card {
-  margin-top: 12px;
-}
-
-.cooldown-card .card-header {
-  background: var(--green-dark);
-}
-
-.cooldown-card .card-title,
-.cooldown-card .card-title-fr {
-  color: var(--white);
-}
-
-.cooldown-card .chevron {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-/* Duos de la section Puissance, medball & core */
-
-.duo-group {
-  border-left: 3px solid var(--green);
-  padding-left: 10px;
+.exercise-block,
+.routine-block {
+  padding-bottom: 14px;
   margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
 }
 
-.duo-header {
+.exercise-block:last-of-type,
+.routine-block:last-of-type {
+  border-bottom: none;
+  margin-bottom: 4px;
+}
+
+.exercise-name {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.exercise-fr {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.exercise-target {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--terracotta-dark);
+}
+
+.routine-block-head {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   margin-bottom: 8px;
 }
 
-.duo-title {
-  font-weight: 700;
-  font-size: 0.95rem;
+.routine-block-head input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  margin-top: 4px;
+  flex-shrink: 0;
+  accent-color: var(--green);
+}
+
+.routine-block-text {
+  flex: 1;
+}
+
+.routine-block-head .exercise-target {
+  margin: 4px 0 0;
+  white-space: nowrap;
+}
+
+.photo-note.warn {
+  color: var(--terracotta-dark);
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.link-btn {
+  border: none;
+  background: none;
+  padding: 8px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--green);
+  cursor: pointer;
+}
+
+.link-btn.center {
+  display: block;
+  margin: 8px auto 0;
+}
+
+.item-actions .link-btn[data-action="exclude"] {
+  color: var(--text-muted);
+}
+
+.decide-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.decide-row .btn,
+.step-nav .btn {
+  flex: 1;
+  margin-top: 0;
+}
+
+.swipe-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.step-nav {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.notice {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fbeee6;
+  color: var(--terracotta-dark);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.logging {
+  margin-top: 6px;
+}
+
+.sets-done {
+  margin: 10px 0 14px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.sets-done.complete {
   color: var(--green);
 }
 
-.duo-sub {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+.done-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.done-check input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--green);
+}
+
+.finisher-detail {
+  margin: 10px 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+/* Exercices exclus (onglet Progression) */
+
+.excluded-card {
+  margin-top: 18px;
+}
+
+.excluded-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.excluded-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+.excluded-list li:last-child {
+  border-bottom: none;
 }
 
 .duo-tag {
@@ -476,14 +572,6 @@ button {
 
 .routine-media .yt-link {
   margin-bottom: 0;
-}
-
-.finisher-option .media-toggle {
-  margin-top: 8px;
-}
-
-.finisher-option .routine-media {
-  padding: 10px 0 0;
 }
 
 .mobility-item input[type="checkbox"] {
@@ -764,13 +852,6 @@ button {
   margin: 0 0 8px;
 }
 
-.draft-hint {
-  text-align: center;
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  margin: 14px 0 8px;
-}
-
 /* Progression view */
 
 .progress-summary {
@@ -849,4 +930,24 @@ button {
   color: var(--text-muted);
   font-size: 0.88rem;
   padding: 24px 8px;
+}
+
+/* Les boutons de décision restent visibles en bas de l'écran pendant qu'on fait défiler une carte longue (duo). */
+.decide-sticky {
+  position: sticky;
+  bottom: 48px; /* juste au-dessus de la barre d'onglets (48 px) */
+  z-index: 5;
+  margin: 14px -16px -16px;
+  padding: 10px 16px 12px;
+  background: var(--white);
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 18px 18px;
+}
+
+.decide-sticky .decide-row {
+  margin-top: 0;
+}
+
+.step-card .exercise-block .exercise-photo {
+  max-height: 220px;
 }

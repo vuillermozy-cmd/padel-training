@@ -1,6 +1,23 @@
 # Padel Training
 
-Application de suivi d'entraînement physique complémentaire au padel (programme 3 séances full body A/B/C). Stack 100% statique (HTML/CSS/JS vanilla, pas de build), données stockées en local via `localStorage`.
+Application de suivi d'entraînement physique complémentaire au padel. Stack 100% statique (HTML/CSS/JS vanilla, pas de build), données stockées en local via `localStorage`, synchronisables entre appareils via un Gist privé.
+
+Chaque séance est composée à la volée, toujours dans le même ordre : Mobilité → Appuis → Duo puissance → Duo rotation & core → Force (jambes, poussée, tirage, tractions) → Conditioning → Retour au calme. L'app affiche une carte par étape : on garde l'exercice proposé (bouton ou swipe à droite), ou on en demande un équivalent du même type de mouvement (bouton ou swipe à gauche). Un exercice peut aussi être exclu définitivement, et remis depuis l'onglet Progression.
+
+## Organisation du code
+
+- `js/data.js` : banque d'exercices (avec leur type de mouvement), appuis, finishers, étirements et déroulé d'une séance.
+- `js/planner.js` : composition de la séance du jour et choix des équivalents (sans accès au navigateur).
+- `js/storage.js` : séries, préférences (exclusions) et plan du jour dans `localStorage`.
+- `js/sync.js` : synchronisation via un Gist privé GitHub.
+- `js/progression.js`, `js/periodization.js`, `js/weights.js` : suggestion de charge, phases de reps, poids standards de salle.
+- `js/app.js` : affichage et interactions.
+
+## Tests
+
+```bash
+node --test tests/*.test.mjs
+```
 
 ## Développement local
 
