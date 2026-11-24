@@ -22,7 +22,6 @@ export const ROUTINE_MEDIA = {
   "childs-pose": { frames: 2 },
   "downward-dog": { frames: 1, credit: { author: "Iveto", license: "CC BY 3.0", url: COMMONS + "Downward-Facing-Dog.JPG" } },
   "worlds-greatest-stretch": { frames: 2 },
-  "lateral-lunge": { frames: 2, note: "Photo avec une barre : à l'échauffement, fais-la au poids du corps." },
   "band-pull-apart": { frames: 2 },
   "foam-roller": { frames: 2, note: "Ici sur les quadriceps : même principe pour mollets, ischios et dos." },
   "seated-hamstring-stretch": { frames: 2 },
@@ -37,20 +36,42 @@ export const ROUTINE_MEDIA = {
   "mountain-climbers": { frames: 2 },
   "lateral-hops": { frames: 2, note: "Ici par-dessus des plots : une simple ligne au sol suffit, l'objectif est la vitesse." },
   "box-shuffle": { frames: 2 },
-  "band-walk": { frames: 2, note: "Élastique aux chevilles sur la photo : au-dessus des genoux, c'est plus facile au début." }
+  "band-walk": { frames: 2, note: "Élastique aux chevilles sur la photo : au-dessus des genoux, c'est plus facile au début." },
+  "cat-cow": { frames: 2 },
+  "inchworm": { frames: 2 },
+  "arm-circles": { frames: 2 },
+  "ankle-circles": { frames: 2 },
+  "hip-circles": { frames: 2 },
+  "lying-windmill": { frames: 2 }
 };
 
-// Routine d'échauffement, identique à chaque séance : uniquement du dynamique, sans mur ni matériel lourd.
+// Mobilité : banque d'exercices dynamiques (sans mur ni matériel lourd), classés par zone.
+// La routine par défaut est toujours la même ; "Mélanger" en tire une nouvelle qui garde au moins un exercice
+// par zone, et "Remplacer" change un exercice contre un autre de la même zone (voir planner.js).
 // media : photos de ROUTINE_MEDIA ; yt : recherche YouTube pour la démo vidéo.
-export const MOBILITY_ROUTINE = [
-  { name: "Child's pose", fr: "posture de l'enfant", sub: "2 x 30s", media: ["childs-pose"], yt: "child's pose yoga" },
-  { name: "Downward dog", fr: "chien tête en bas", sub: "2 x 30s", media: ["downward-dog"], yt: "downward dog yoga pose" },
-  { name: "World's greatest stretch", fr: "étirement dynamique complet", sub: "2 x 5/côté", media: ["worlds-greatest-stretch"], yt: "world's greatest stretch" },
-  { name: "Lateral lunge", fr: "fente latérale, jambe opposée tendue", sub: "2 x 6/côté", media: ["lateral-lunge"], yt: "bodyweight lateral lunge" },
-  { name: "90/90 hip switches", fr: "90-90 hanches (balai)", sub: "2 x 8/côté", media: [], yt: "90 90 hip switches" },
-  { name: "Band shoulder rotations", fr: "rotations d'épaule à l'élastique", sub: "2 x 15", media: [], yt: "band shoulder dislocates" },
-  { name: "Band pull-aparts", fr: "écartés d'élastique, omoplates serrées", sub: "2 x 15", media: ["band-pull-apart"], yt: "band pull apart" }
+export const MOBILITY_ZONES = ["full", "hips", "spine", "shoulders", "ankles"];
+export const MOBILITY_SIZE = 7;
+export const MOBILITY = [
+  { id: "childs-pose", zone: "full", name: "Child's pose", fr: "posture de l'enfant", sub: "2 x 30s", media: ["childs-pose"], yt: "child's pose yoga" },
+  { id: "downward-dog", zone: "full", name: "Downward dog", fr: "chien tête en bas", sub: "2 x 30s", media: ["downward-dog"], yt: "downward dog yoga pose" },
+  { id: "inchworm", zone: "full", name: "Inchworm", fr: "marche des mains jusqu'à la planche, puis retour", sub: "2 x 5", media: ["inchworm"], yt: "inchworm exercise" },
+  { id: "worlds-greatest-stretch", zone: "spine", name: "World's greatest stretch", fr: "étirement dynamique complet", sub: "2 x 5/côté", media: ["worlds-greatest-stretch"], yt: "world's greatest stretch" },
+  { id: "cat-cow", zone: "spine", name: "Cat-cow", fr: "dos rond / dos creux à quatre pattes", sub: "2 x 8", media: ["cat-cow"], yt: "cat cow stretch" },
+  { id: "lying-windmill", zone: "spine", name: "Lying windmill", fr: "allongé, jambe tendue croisée de l'autre côté", sub: "2 x 6/côté", media: ["lying-windmill"], yt: "lying leg crossover stretch dynamic" },
+  { id: "open-book", zone: "spine", name: "Open book", fr: "couché sur le côté, rotation thoracique bras ouvert", sub: "2 x 6/côté", media: [], yt: "open book thoracic rotation" },
+  { id: "hip-switches", zone: "hips", name: "90/90 hip switches", fr: "90-90 hanches (balai)", sub: "2 x 8/côté", media: [], yt: "90 90 hip switches" },
+  { id: "hip-circles", zone: "hips", name: "Standing hip circles", fr: "cercles de genou debout, hanche ouverte", sub: "2 x 6/côté", media: ["hip-circles"], yt: "standing hip circles open the gate" },
+  { id: "leg-swings", zone: "hips", name: "Leg swings", fr: "balancés de jambe avant-arrière et latéraux", sub: "2 x 10/côté", media: [], yt: "leg swings dynamic warm up" },
+  { id: "frog-rocks", zone: "hips", name: "Frog rocks", fr: "à quatre pattes genoux écartés, bascule arrière", sub: "2 x 8", media: [], yt: "frog rocks adductor mobility" },
+  { id: "band-shoulder-rotations", zone: "shoulders", name: "Band shoulder rotations", fr: "rotations d'épaule à l'élastique", sub: "2 x 15", media: [], yt: "band shoulder dislocates" },
+  { id: "band-pull-aparts", zone: "shoulders", name: "Band pull-aparts", fr: "écartés d'élastique, omoplates serrées", sub: "2 x 15", media: ["band-pull-apart"], yt: "band pull apart" },
+  { id: "arm-circles", zone: "shoulders", name: "Arm circles", fr: "cercles de bras, petits puis grands", sub: "2 x 10/sens", media: ["arm-circles"], yt: "arm circles warm up" },
+  { id: "ankle-rocks", zone: "ankles", name: "Half-kneeling ankle rocks", fr: "un genou au sol, genou avant vers l'avant, talon au sol", sub: "2 x 10/côté", media: [], yt: "half kneeling ankle rocks mobility" },
+  { id: "ankle-circles", zone: "ankles", name: "Ankle circles", fr: "cercles de cheville", sub: "2 x 10/sens", media: ["ankle-circles"], yt: "ankle circles mobility" }
 ];
+
+// Routine habituelle (la fente latérale est retirée, remplacée par les ankle rocks).
+export const MOBILITY_DEFAULT = ["childs-pose", "downward-dog", "worlds-greatest-stretch", "hip-switches", "band-shoulder-rotations", "band-pull-aparts", "ankle-rocks"];
 
 // Appuis : vitesse du jeu de jambes, en début de séance pendant qu'on est frais. 2 exercices par séance.
 // Sans charge, sauf le mini-élastique et les 2 exercices lents avec poids aux chevilles (demandés par Yann ;
@@ -176,16 +197,16 @@ export const COOLDOWN = {
 //   kind "strength" : un exercice du slot.
 //   kind "finisher" : un finisher.
 export const STEPS = [
-  { id: "mobility", kind: "mobility", short: "Mobilité", title: "Mobilité & souplesse" },
-  { id: "footwork", kind: "footwork", short: "Appuis", title: "Appuis · vitesse des pieds", count: 2 },
+  { id: "mobility", kind: "mobility", short: "Mobilité", title: "Mobilité" },
+  { id: "footwork", kind: "footwork", short: "Appuis", title: "Appuis", count: 2 },
   { id: "duo1", kind: "duo", short: "Duo 1", title: "Duo 1 · Puissance", slots: ["jump", "explosive-push"], rest: "90s" },
   { id: "duo2", kind: "duo", short: "Duo 2", title: "Duo 2 · Rotation & core", slots: ["rotation", "core"], rest: "60s" },
   { id: "legs", kind: "strength", short: "Jambes", title: "Force · Jambes", slot: "legs" },
   { id: "push", kind: "strength", short: "Poussée", title: "Force · Poussée", slot: "push" },
   { id: "row", kind: "strength", short: "Tirage", title: "Force · Tirage horizontal", slot: "row" },
   { id: "vpull", kind: "strength", short: "Tractions", title: "Force · Tirage vertical", slot: "vertical-pull", fixedOrder: true },
-  { id: "conditioning", kind: "finisher", short: "Cardio", title: "Conditioning · finisher" },
-  { id: "cooldown", kind: "cooldown", short: "Calme", title: "Retour au calme & étirements" }
+  { id: "conditioning", kind: "finisher", short: "Cardio", title: "Conditioning" },
+  { id: "cooldown", kind: "cooldown", short: "Calme", title: "Retour au calme" }
 ];
 
 export const PATTERN_LABELS = {
@@ -195,7 +216,7 @@ export const PATTERN_LABELS = {
 
 export const LOWER_BODY_MUSCLES = LEGS;
 
-const BY_ID = new Map([...EXERCISES, ...FOOTWORK, ...FINISHERS].map((item) => [item.id, item]));
+const BY_ID = new Map([...EXERCISES, ...FOOTWORK, ...FINISHERS, ...MOBILITY].map((item) => [item.id, item]));
 
 // Retourne l'exercice (ou exercice d'appuis, ou finisher) pour un id donné, ou null (ex. exercice retiré).
 export function findExercise(exerciseId) {

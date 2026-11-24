@@ -132,3 +132,42 @@ test("au plus un exercice d'appuis lent (poids aux chevilles) par séance", () =
     assert.ok(slow.length <= 1, `séance ${sessionIndex}`);
   }
 });
+
+import { MOBILITY, MOBILITY_ZONES, MOBILITY_SIZE, MOBILITY_DEFAULT } from "../js/data.js";
+import { ensureMobility, shuffleMobility, replaceMobility } from "../js/planner.js";
+
+// Générateur pseudo-aléatoire reproductible.
+const seeded = (seed) => () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const zoneOf = (id) => MOBILITY.find((m) => m.id === id).zone;
+
+test("mobilité : routine habituelle par défaut, sans la fente latérale", () => {
+  const plan = ensureMobility(newPlan("d"), new Set());
+  assert.deepEqual(plan.mobility, MOBILITY_DEFAULT);
+  assert.ok(!plan.mobility.includes("lateral-lunge"));
+  assert.deepEqual(new Set(plan.mobility.map(zoneOf)), new Set(MOBILITY_ZONES));
+});
+
+test("mobilité : « Mélanger » couvre toutes les zones, sans doublon, et varie", () => {
+  const rng = seeded(42);
+  const routines = new Set();
+  for (let i = 0; i < 50; i++) {
+    const plan = shuffleMobility(newPlan("d"), new Set(), rng);
+    assert.equal(plan.mobility.length, MOBILITY_SIZE);
+    assert.equal(new Set(plan.mobility).size, MOBILITY_SIZE);
+    assert.deepEqual(new Set(plan.mobility.map(zoneOf)), new Set(MOBILITY_ZONES));
+    routines.add(plan.mobility.join());
+  }
+  assert.ok(routines.size > 10);
+});
+
+test("mobilité : « Remplacer » prend un autre exercice de la même zone, absent de la routine", () => {
+  const rng = seeded(7);
+  const plan = ensureMobility(newPlan("d"), new Set());
+  for (let i = 0; i < plan.mobility.length; i++) {
+    const before = plan.mobility[i];
+    replaceMobility(plan, i, new Set(), rng);
+    assert.notEqual(plan.mobility[i], before);
+    assert.equal(zoneOf(plan.mobility[i]), zoneOf(before));
+    assert.equal(new Set(plan.mobility).size, plan.mobility.length);
+  }
+});

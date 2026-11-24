@@ -2,7 +2,7 @@
 
 Application de suivi d'entraînement physique complémentaire au padel. Stack 100% statique (HTML/CSS/JS vanilla, pas de build), données stockées en local via `localStorage`, synchronisables entre appareils via un Gist privé.
 
-Chaque séance est composée à la volée, toujours dans le même ordre : Mobilité → Appuis → Duo puissance → Duo rotation & core → Force (jambes, poussée, tirage, tractions) → Conditioning → Retour au calme. L'app affiche une carte par étape : on garde l'exercice proposé (bouton ou swipe à droite), ou on en demande un équivalent du même type de mouvement (bouton ou swipe à gauche). Un exercice peut aussi être exclu définitivement, et remis depuis l'onglet Progression.
+Chaque séance est composée à la volée, toujours dans le même ordre : Mobilité → Appuis → Duo puissance → Duo rotation & core → Force (jambes, poussée, tirage, tractions) → Conditioning → Retour au calme. L'app affiche une carte par étape : swipe à droite = étape faite, swipe à gauche = étape passée, et dans les deux cas on va à l'étape suivante (au doigt ou à la souris). La flèche ‹ revient à l'étape précédente. « Remplacer » propose un équivalent du même type de mouvement, « Ne plus proposer » exclut un exercice (réversible depuis la page Progression, ouverte par le compteur de séances). La mobilité a son bouton « Mélanger », qui tire une nouvelle routine couvrant toutes les zones.
 
 ## Organisation du code
 

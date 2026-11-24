@@ -1,10 +1,11 @@
 // Composition de la séance du jour, sans aucun accès au navigateur (testable en Node).
 //
-// Le plan du jour : { date, choices, skipped, kept, current }
+// Le plan du jour : { date, choices, skipped, status, mobility, current }
 //   choices : clé → id choisi. Une clé par exercice à choisir : "legs", "duo1:0", "duo1:1", "footwork:0", "conditioning"…
 //   skipped : clé → ids refusés "pas aujourd'hui" pour cette clé (on ne les repropose pas tant qu'il reste autre chose).
-//   kept    : étape → true quand l'exercice proposé est gardé ("Je garde").
-//   current : index de l'étape affichée.
+//   status  : étape → "done" (swipe à droite) ou "skipped" (swipe à gauche).
+//   mobility: ids de la routine de mobilité du jour.
+//   current : index de l'étape affichée (STEPS.length = séance terminée).
 // Les choix sont figés dans le plan : enregistrer une série ne change pas ce qui est proposé dans la journée.
 //
 // Contexte (ctx) : { sets, excluded, sessionIndex }
@@ -12,10 +13,10 @@
 //   excluded     : Set des ids "plus jamais".
 //   sessionIndex : nombre de séances avant aujourd'hui (fait tourner appuis et finishers, qui ne sont pas notés).
 
-import { STEPS, EXERCISES, FOOTWORK, FINISHERS } from "./data.js";
+import { STEPS, EXERCISES, FOOTWORK, FINISHERS, MOBILITY, MOBILITY_ZONES, MOBILITY_SIZE, MOBILITY_DEFAULT } from "./data.js";
 
 export function newPlan(date) {
-  return { date, choices: {}, skipped: {}, kept: {}, current: 0 };
+  return { date, choices: {}, skipped: {}, status: {}, mobility: null, current: 0 };
 }
 
 export function keysForStep(step) {
@@ -149,4 +150,49 @@ export function canExclude(key, id, ctx) {
 export function legsPattern(plan) {
   const ex = EXERCISES.find((e) => e.id === plan.choices.legs);
   return ex ? ex.pattern : "squat";
+}
+
+// ── Mobilité
+
+function pickRandom(list, rng) {
+  return list[Math.floor(rng() * list.length)];
+}
+
+// Routine habituelle (un exercice exclu est remplacé par un autre de la même zone).
+export function ensureMobility(plan, excluded, rng = Math.random) {
+  if (!Array.isArray(plan.mobility)) plan.mobility = [...MOBILITY_DEFAULT];
+  plan.mobility = plan.mobility.map((id, i) => (excluded.has(id) ? replacementFor(plan.mobility, i, excluded, rng) || id : id));
+  return plan;
+}
+
+// Nouvelle routine : un exercice par zone, complétée au hasard, puis remise dans l'ordre de la banque.
+export function shuffleMobility(plan, excluded, rng = Math.random) {
+  const pool = MOBILITY.filter((m) => !excluded.has(m.id));
+  const picked = [];
+  MOBILITY_ZONES.forEach((zone) => {
+    const options = pool.filter((m) => m.zone === zone && !picked.includes(m.id));
+    if (options.length) picked.push(pickRandom(options, rng).id);
+  });
+  while (picked.length < MOBILITY_SIZE) {
+    const options = pool.filter((m) => !picked.includes(m.id));
+    if (!options.length) break;
+    picked.push(pickRandom(options, rng).id);
+  }
+  plan.mobility = MOBILITY.filter((m) => picked.includes(m.id)).map((m) => m.id);
+  return plan;
+}
+
+// Autre exercice de la même zone (ou, à défaut, de n'importe quelle zone) absent de la routine.
+function replacementFor(routine, index, excluded, rng) {
+  const current = MOBILITY.find((m) => m.id === routine[index]);
+  const free = MOBILITY.filter((m) => !excluded.has(m.id) && !routine.includes(m.id));
+  const sameZone = free.filter((m) => current && m.zone === current.zone);
+  const options = sameZone.length ? sameZone : free;
+  return options.length ? pickRandom(options, rng).id : null;
+}
+
+export function replaceMobility(plan, index, excluded, rng = Math.random) {
+  const next = replacementFor(plan.mobility, index, excluded, rng);
+  if (next) plan.mobility[index] = next;
+  return Boolean(next);
 }

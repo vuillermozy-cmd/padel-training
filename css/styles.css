@@ -25,7 +25,7 @@ html, body {
 }
 
 body {
-  padding-bottom: 72px; /* place pour la bottom nav */
+  padding-bottom: 24px;
   min-height: 100vh;
 }
 
@@ -38,23 +38,32 @@ button {
 .app-header {
   background: var(--green);
   color: var(--white);
-  padding: 16px 16px 14px;
+  padding: 8px 12px 8px 4px;
   position: sticky;
   top: 0;
   z-index: 10;
-}
-
-.app-header-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
 }
 
 .app-header h1 {
-  font-size: 1.3rem;
+  flex: 1;
+  font-size: 1.1rem;
   margin: 0;
   font-weight: 700;
+}
+
+.back-btn {
+  border: none;
+  background: none;
+  color: var(--white);
+  font-size: 1.9rem;
+  line-height: 1;
+  width: 40px;
+  height: 40px;
+  padding: 0 0 4px;
+  cursor: pointer;
 }
 
 .session-badge {
@@ -77,43 +86,10 @@ button {
   background: var(--terracotta-dark);
 }
 
-.app-header-sub {
-  margin: 6px 0 0;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-/* Bottom nav */
-
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  background: var(--white);
-  border-top: 1px solid var(--line);
-  z-index: 10;
-}
-
-.bottom-nav-btn {
-  flex: 1;
-  border: none;
-  background: none;
-  padding: 14px 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.bottom-nav-btn.active {
-  color: var(--green);
-}
-
 /* View container */
 
 .view-container {
-  padding: 16px;
+  padding: 10px 12px 16px;
   max-width: 640px;
   margin: 0 auto;
 }
@@ -158,50 +134,243 @@ button {
 
 /* Séance : une carte plein écran par étape */
 
-.step-bar {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  margin: -4px -16px 12px;
-  padding: 0 16px 4px;
-  scrollbar-width: none;
-}
-
-.step-bar::-webkit-scrollbar {
-  display: none;
-}
-
-.step-chip {
-  flex-shrink: 0;
-  border: 1px solid var(--line);
+.step-card {
   background: var(--white);
-  color: var(--text-muted);
-  border-radius: 999px;
-  padding: 7px 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px 14px 10px;
+  min-height: calc(100vh - 92px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.step-card input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Fine barre de progression : un trait par étape, zone tactile plus haute que le trait. */
+.progress-bar {
+  display: flex;
+  gap: 4px;
+  margin: -4px 0 6px;
+}
+
+.progress-seg {
+  flex: 1;
+  border: none;
+  background: none;
+  padding: 7px 0;
   cursor: pointer;
 }
 
-.step-chip.done {
-  color: var(--green);
-  border-color: var(--green);
+.progress-seg span {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
 }
 
-.step-chip.active {
+.progress-seg.done span {
+  background: var(--green);
+}
+
+.progress-seg.skipped span {
+  background: #d9b9a3;
+}
+
+.progress-seg.current span {
+  background: var(--terracotta);
+  height: 7px;
+  margin-top: -1px;
+}
+
+.step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.step-count {
+  margin-left: 8px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.step-sub {
+  margin: -4px 0 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.shuffle-btn {
+  border: 1px solid var(--line);
+  background: var(--white);
+  color: var(--green);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.exercise-block {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.exercise-block:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.item-head .exercise-target {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.media-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.media-row .yt-link {
+  margin: 0;
+}
+
+.item-links {
+  display: flex;
+  gap: 14px;
+}
+
+.link-btn.muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.last-time {
+  margin: 8px 0 10px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.logging .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.sets-count {
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* Listes compactes (mobilité, étirements) */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list-row {
+  border-bottom: 1px solid var(--line);
+}
+
+.list-row:last-child {
+  border-bottom: none;
+}
+
+.list-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+}
+
+.list-row-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.list-row-sub {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--terracotta-dark);
+  white-space: nowrap;
+}
+
+.icon-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  background: var(--white);
+  color: var(--green);
+  border-radius: 50%;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.icon-btn.open {
   background: var(--green);
   border-color: var(--green);
   color: var(--white);
 }
 
-.step-card {
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 18px 16px 16px;
-  min-height: calc(100vh - 260px);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  position: relative;
+.list-row-media {
+  padding: 0 0 10px;
+}
+
+.list-row-media .exercise-photo-wrap {
+  margin: 0 0 8px;
+}
+
+/* Fin de séance */
+
+.step-card.finished {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.finished-emoji {
+  font-size: 3rem;
+  margin: 0;
+}
+
+.finished-detail {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+}
+
+.phase-line {
+  margin: -6px 0 14px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 /* Le geste horizontal est géré par l'app, le vertical reste le défilement de la page. */
@@ -226,79 +395,23 @@ button {
   color: var(--terracotta-dark);
 }
 
-.step-intro {
-  margin: 0 0 12px;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-.exercise-block,
-.routine-block {
-  padding-bottom: 14px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.exercise-block:last-of-type,
-.routine-block:last-of-type {
-  border-bottom: none;
-  margin-bottom: 4px;
-}
-
 .exercise-name {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   line-height: 1.25;
-}
-
-.exercise-fr {
-  margin: 4px 0 0;
-  font-size: 0.88rem;
-  color: var(--text-muted);
 }
 
 .exercise-target {
   margin: 8px 0 0;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--terracotta-dark);
-}
-
-.routine-block-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.routine-block-head input[type="checkbox"] {
-  width: 22px;
-  height: 22px;
-  margin-top: 4px;
-  flex-shrink: 0;
-  accent-color: var(--green);
-}
-
-.routine-block-text {
-  flex: 1;
-}
-
-.routine-block-head .exercise-target {
-  margin: 4px 0 0;
-  white-space: nowrap;
 }
 
 .photo-note.warn {
   color: var(--terracotta-dark);
   font-weight: 600;
   margin: 0 0 8px;
-}
-
-.item-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
 }
 
 .link-btn {
@@ -311,38 +424,11 @@ button {
   cursor: pointer;
 }
 
-.link-btn.center {
-  display: block;
-  margin: 8px auto 0;
-}
-
-.item-actions .link-btn[data-action="exclude"] {
-  color: var(--text-muted);
-}
-
-.decide-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.decide-row .btn,
-.step-nav .btn {
-  flex: 1;
-  margin-top: 0;
-}
-
 .swipe-hint {
   margin: 8px 0 0;
   text-align: center;
   font-size: 0.75rem;
   color: var(--text-muted);
-}
-
-.step-nav {
-  display: flex;
-  gap: 10px;
-  margin-top: 14px;
 }
 
 .notice {
@@ -355,36 +441,6 @@ button {
   line-height: 1.4;
 }
 
-.logging {
-  margin-top: 6px;
-}
-
-.sets-done {
-  margin: 10px 0 14px;
-  text-align: center;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.sets-done.complete {
-  color: var(--green);
-}
-
-.done-check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-  font-weight: 600;
-}
-
-.done-check input {
-  width: 22px;
-  height: 22px;
-  accent-color: var(--green);
-}
-
 .finisher-detail {
   margin: 10px 0;
   font-size: 0.95rem;
@@ -392,10 +448,6 @@ button {
 }
 
 /* Exercices exclus (onglet Progression) */
-
-.excluded-card {
-  margin-top: 18px;
-}
 
 .excluded-list {
   list-style: none;
@@ -607,7 +659,7 @@ button {
 /* Exercise demo photo (2 frames en alternance façon GIF) */
 
 .exercise-photo-wrap {
-  margin: 8px 0 14px;
+  margin: 0 0 6px;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -618,7 +670,7 @@ button {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 260px;
+  max-height: 230px;
   object-fit: contain;
   background: var(--beige);
 }
@@ -641,7 +693,7 @@ button {
 .stepper-row {
   display: flex;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .stepper {
@@ -655,14 +707,6 @@ button {
   font-weight: 600;
   margin-bottom: 6px;
   display: block;
-}
-
-.stepper-subunit {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  text-align: center;
 }
 
 .unit-sub {
@@ -746,18 +790,6 @@ button {
   background: var(--beige);
 }
 
-/* Sauvegarde (onglet Progression) */
-
-.backup-card {
-  margin-top: 18px;
-}
-
-/* Synchronisation (onglet Progression) */
-
-.sync-card {
-  margin-top: 18px;
-}
-
 .sync-text {
   margin: 0 0 8px;
   font-size: 0.85rem;
@@ -813,35 +845,6 @@ button {
 }
 
 /* Suggestion + history */
-
-.suggestion-box {
-  background: var(--beige);
-  border: 1px dashed var(--terracotta);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 0.85rem;
-  margin-bottom: 14px;
-  color: var(--text);
-}
-
-.history-list {
-  margin: 0 0 14px;
-  padding: 0;
-  list-style: none;
-  font-size: 0.82rem;
-  color: var(--text-muted);
-}
-
-.history-list li {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.history-list li:last-child {
-  border-bottom: none;
-}
 
 .section-label {
   font-size: 0.78rem;
@@ -932,22 +935,3 @@ button {
   padding: 24px 8px;
 }
 
-/* Les boutons de décision restent visibles en bas de l'écran pendant qu'on fait défiler une carte longue (duo). */
-.decide-sticky {
-  position: sticky;
-  bottom: 48px; /* juste au-dessus de la barre d'onglets (48 px) */
-  z-index: 5;
-  margin: 14px -16px -16px;
-  padding: 10px 16px 12px;
-  background: var(--white);
-  border-top: 1px solid var(--line);
-  border-radius: 0 0 18px 18px;
-}
-
-.decide-sticky .decide-row {
-  margin-top: 0;
-}
-
-.step-card .exercise-block .exercise-photo {
-  max-height: 220px;
-}

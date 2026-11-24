@@ -1,10 +1,16 @@
-import { MOBILITY_ROUTINE, ROUTINE_MEDIA, COOLDOWN, STEPS, EXERCISES, PATTERN_LABELS, findExercise, findItem, exerciseName } from "./data.js";
+import { ROUTINE_MEDIA, COOLDOWN, STEPS, EXERCISES, findExercise, findItem, exerciseName } from "./data.js";
 import * as storage from "./storage.js";
 import * as sync from "./sync.js";
-import { newPlan, ensureChoices, keysForStep, swapKey, swapStep, canExclude, legsPattern } from "./planner.js";
+import { newPlan, ensureChoices, keysForStep, swapKey, canExclude, legsPattern, ensureMobility, shuffleMobility, replaceMobility } from "./planner.js";
 import { getProgressionSuggestion } from "./progression.js";
 import { getCurrentPhase, getStrengthSub } from "./periodization.js";
 import { lbToKg, snapWeight, stepWeight, DEFAULT_WEIGHT_LB } from "./weights.js";
+
+// Écran de séance : une carte par étape, le moins d'informations possible.
+//   Swipe à droite = étape faite → étape suivante.
+//   Swipe à gauche = je ne la fais pas → étape suivante.
+//   Flèche ‹ en haut à gauche = étape précédente.
+// Le swipe marche au doigt et à la souris (glisser la carte).
 
 // Photos de démonstration (position de départ / position finale) issues de free-exercise-db
 // (domaine public, github.com/yuhonas/free-exercise-db), stockées localement dans img/exercises/<id>/.
@@ -17,30 +23,23 @@ const SWIPE_EDGE_PX = 28;
 function renderPhotoFrames(frame0, frame1, alt) {
   return `
     <div class="exercise-photo-wrap">
-      <img class="exercise-photo" src="${frame0}" data-frame0="${frame0}" data-frame1="${frame1}" data-current="0" alt="Démonstration : ${alt}" />
+      <img class="exercise-photo" src="${frame0}" data-frame0="${frame0}" data-frame1="${frame1}" data-current="0" alt="Démonstration : ${alt}" draggable="false" />
     </div>
   `;
 }
 
-function renderExercisePhoto(exercise) {
-  if (exercise.noPhoto) return `<p class="photo-note">Pas de photo libre de droits fiable pour ce mouvement : regarde la vidéo.</p>`;
-  return renderPhotoFrames(`img/exercises/${exercise.id}/0.jpg`, `img/exercises/${exercise.id}/1.jpg`, exercise.name);
+function videoLink(query) {
+  return `<a class="yt-link" href="https://www.youtube.com/results?search_query=${encodeURIComponent(query)}" target="_blank" rel="noopener noreferrer">▶ Vidéo</a>`;
 }
 
-function youtubeLink(query) {
-  return `<a class="yt-link" href="https://www.youtube.com/results?search_query=${encodeURIComponent(query)}" target="_blank" rel="noopener noreferrer">▶ Voir une démo vidéo</a>`;
+// Photo d'un exercice noté (ou rien s'il n'existe pas de photo fiable : le lien vidéo suffit).
+function exercisePhoto(exercise) {
+  return exercise.noPhoto ? "" : renderPhotoFrames(`img/exercises/${exercise.id}/0.jpg`, `img/exercises/${exercise.id}/1.jpg`, exercise.name);
 }
 
-// Bouton "Démo" d'un élément de routine (mobilité, appuis, conditioning, étirements).
-function renderMediaToggle(key) {
-  const open = uiState.openMedia.has(key);
-  return `<button class="media-toggle ${open ? "open" : ""}" data-action="toggle-media" data-key="${key}">${open ? "Masquer" : "Démo"}</button>`;
-}
-
-// Photos dépliées d'un élément de routine, avec leurs crédits, puis le lien vidéo.
-function renderRoutineMedia(item, key, { always = false } = {}) {
-  if (!always && !uiState.openMedia.has(key)) return "";
-  const photos = item.media.map((id) => {
+// Photos d'un élément de routine (mobilité, appuis, finisher, étirements), avec leur crédit éventuel.
+function routinePhotos(item) {
+  return item.media.map((id) => {
     const media = ROUTINE_MEDIA[id];
     const frame0 = `img/routine/${id}/0.jpg`;
     const frame1 = media.frames === 2 ? `img/routine/${id}/1.jpg` : frame0;
@@ -48,12 +47,6 @@ function renderRoutineMedia(item, key, { always = false } = {}) {
       + (media.note ? `<p class="photo-note">${media.note}</p>` : "")
       + (media.credit ? `<p class="photo-credit">Photo : <a href="${media.credit.url}" target="_blank" rel="noopener noreferrer">${media.credit.author}</a>, ${media.credit.license}, Wikimedia Commons</p>` : "");
   }).join("");
-  return `
-    <div class="routine-media">
-      ${photos || `<p class="photo-note">Pas de photo libre de droits pour ce mouvement : regarde la vidéo.</p>`}
-      ${youtubeLink(item.yt)}
-    </div>
-  `;
 }
 
 setInterval(() => {
@@ -65,21 +58,16 @@ setInterval(() => {
 }, PHOTO_TOGGLE_INTERVAL_MS);
 
 const viewContainer = document.getElementById("view-container");
-const historySheet = document.getElementById("history-sheet");
 const sessionBadge = document.getElementById("session-badge");
-const nextDayHint = document.getElementById("next-day-hint");
-const phaseHint = document.getElementById("phase-hint");
-const bottomNav = document.getElementById("bottom-nav");
+const backBtn = document.getElementById("back-btn");
 
 const uiState = {
-  view: "seance",
-  checked: new Set(), // éléments de routine cochés aujourd'hui ("mobility-0", "cooldown-2", "footwork:1"…)
-  historyOpen: false,
-  openMedia: new Set(), // clés des éléments de routine dont la démo est dépliée
+  view: "seance", // "seance" | "progression"
+  openMedia: new Set(), // éléments de liste (mobilité, étirements) dont la démo est dépliée
   inputs: {}, // exerciseId -> { weightLb, reps, distanceM } (selon la mesure de l'exercice)
   progressionExerciseId: null,
   backupMessage: "",
-  notice: "" // message bref sous la carte (ex. "Tu as fait le tour des équivalents")
+  notice: "" // message bref sur la carte (ex. exclusion impossible)
 };
 
 let chartInstance = null;
@@ -96,11 +84,11 @@ function planContext() {
 
 function getPlan() {
   let plan = storage.loadPlan();
-  if (!plan || plan.date !== storage.today()) {
-    plan = newPlan(storage.today());
-    uiState.checked.clear();
-  }
-  ensureChoices(plan, planContext());
+  if (!plan || plan.date !== storage.today()) plan = newPlan(storage.today());
+  if (!plan.status) plan.status = {}; // plan enregistré par la version précédente
+  const ctx = planContext();
+  ensureChoices(plan, ctx);
+  ensureMobility(plan, ctx.excluded);
   storage.savePlan(plan);
   return plan;
 }
@@ -133,11 +121,11 @@ function kgSub(weightLb) {
 
 function weightLabel(exercise) {
   if (exercise.equipment === "medball") return "Balle (lb)";
-  if (exercise.perDumbbell) return "Poids par haltère (lb)";
+  if (exercise.perDumbbell) return "Lb / haltère";
   return "Poids (lb)";
 }
 
-// Série formatée selon la mesure de l'exercice (fiche, historique, onglet Progression).
+// Série formatée selon la mesure de l'exercice (fiche, onglet Progression).
 function formatSet(exercise, set) {
   if (exercise.metric === "reps") return `${set.reps} reps`;
   const weight = `${formatWeight(set.weightLb)} lb ${kgSub(set.weightLb)}`;
@@ -165,38 +153,26 @@ function formatDateFr(isoDate) {
 
 function updateHeader() {
   const total = storage.getTotalSessions();
-  const firstDate = storage.getFirstSessionDate();
   sessionBadge.textContent = `${total} séance${total > 1 ? "s" : ""}`;
-  const number = storage.getSessionsBeforeToday() + 1;
-  nextDayHint.textContent = storage.hasTrainedToday() ? `Séance n° ${number} en cours` : `Séance n° ${number}`;
-  phaseHint.textContent = `Phase actuelle (force) : ${currentPhase.label} · bloc ${currentPhase.block}`
-    + (firstDate ? ` · depuis le ${formatDateFr(firstDate)}` : "");
+  // La flèche ‹ : étape précédente pendant la séance, retour à la séance depuis la progression.
+  const plan = getPlan();
+  backBtn.style.visibility = uiState.view === "progression" || plan.current > 0 ? "visible" : "hidden";
 }
 
-// ── Saisie d'une série
+// ── Saisie d'une série (visible directement sur la carte)
 
-function renderSuggestionHint(exercise, suggestion, exerciseSub) {
+// Une ligne : la dernière fois, et la suggestion si elle change quelque chose.
+function renderLastTime(exercise) {
+  const suggestion = getProgressionSuggestion(exercise, currentPhase);
+  if (!suggestion) return "";
   const { next } = suggestion;
-  if (exercise.metric === "reps") {
-    return exercise.repScheme === "max"
-      ? `💡 Vise <strong>${next.reps} reps</strong> sur ta meilleure série, une de plus que la dernière fois.`
-      : "";
-  }
-  if (exercise.equipment === "medball") {
-    return "Garde la même balle et vise la vitesse d'exécution.";
-  }
-  const nextWeight = `<strong>${formatWeight(next.weightLb)} lb</strong> ${kgSub(next.weightLb)}`;
-  if (exercise.metric === "carry") {
-    return suggestion.reachedTarget
-      ? `💡 ${exercise.targetDistanceM} m atteints → passe à ${nextWeight}`
-      : `Vise ${exercise.targetDistanceM} m par côté avant d'augmenter le poids.`;
-  }
-  return suggestion.reachedTarget
-    ? `💡 Fourchette haute atteinte → passe à ${nextWeight}`
-    : `Vise ${exerciseSub.split("·")[0].trim()} avant d'augmenter le poids.`;
+  let hint = "";
+  if (exercise.repScheme === "max") hint = ` → vise ${next.reps}`;
+  else if (suggestion.reachedTarget) hint = ` → <strong>${formatWeight(next.weightLb)} lb</strong>`;
+  return `<p class="last-time">Dernière fois : ${formatSet(exercise, suggestion.last)}${hint}</p>`;
 }
 
-function renderStepper({ label, action, role, id, value, step, inputmode, sub }) {
+function renderStepper({ label, action, role, id, value, step, inputmode }) {
   return `
     <div class="stepper">
       <span class="stepper-label">${label}</span>
@@ -205,7 +181,6 @@ function renderStepper({ label, action, role, id, value, step, inputmode, sub })
         <input class="stepper-input" type="number" inputmode="${inputmode}" step="${step}" data-role="${role}" data-id="${id}" value="${value}" />
         <button class="stepper-btn" data-action="inc-${action}" data-id="${id}">+</button>
       </div>
-      ${sub ? `<span class="stepper-subunit">${sub}</span>` : ""}
     </div>
   `;
 }
@@ -214,9 +189,9 @@ function renderSteppers(exercise, input) {
   const steppers = [];
   if (hasWeight(exercise)) {
     steppers.push(renderStepper({
-      label: weightLabel(exercise), action: "weight", role: "weight-input", id: exercise.id,
-      value: formatWeight(input.weightLb), step: "any", inputmode: "decimal",
-      sub: `≈ ${formatWeight(Math.round(lbToKg(input.weightLb) * 10) / 10)} kg`
+      label: `${weightLabel(exercise)} <span class="unit-sub">≈ ${formatWeight(Math.round(lbToKg(input.weightLb) * 10) / 10)} kg</span>`,
+      action: "weight", role: "weight-input", id: exercise.id,
+      value: formatWeight(input.weightLb), step: "any", inputmode: "decimal"
     }));
   }
   if (exercise.metric === "carry") {
@@ -237,230 +212,178 @@ function targetSets(exercise) {
   return exercise.sets || parseInt(exercise.sub, 10) || 3;
 }
 
-// Saisie (visible une fois l'exercice gardé) : dernière fois, suggestion, steppers, enregistrement, historique.
 function renderLogging(exercise) {
-  const input = getInput(exercise);
-  const suggestion = getProgressionSuggestion(exercise, currentPhase);
-  const history = storage.getSetsForExercise(exercise.id).slice(-5).reverse();
   const doneToday = storage.getTodaySets().filter((s) => s.exerciseId === exercise.id).length;
-  const exerciseSub = getExerciseSub(exercise);
-
-  let suggestionBox = `<div class="suggestion-box">Aucune donnée encore : entre ta première série ci-dessous.</div>`;
-  if (suggestion) {
-    const hint = renderSuggestionHint(exercise, suggestion, exerciseSub);
-    suggestionBox = `
-      <div class="suggestion-box">
-        Dernière fois : <strong>${formatSet(exercise, suggestion.last)}</strong> (${formatDateFr(suggestion.last.date)})
-        ${hint ? `<br/>${hint}` : ""}
-      </div>
-    `;
-  }
-
+  const target = targetSets(exercise);
   return `
     <div class="logging">
-      ${suggestionBox}
-      ${renderSteppers(exercise, input)}
-      <button class="btn btn-primary" data-action="save-set" data-id="${exercise.id}">Enregistrer cette série</button>
-      <p class="sets-done ${doneToday >= targetSets(exercise) ? "complete" : ""}">Séries aujourd'hui : ${doneToday} / ${targetSets(exercise)}</p>
-      ${history.length ? `
-        <p class="section-label">Historique récent</p>
-        <ul class="history-list">
-          ${history.map((h) => `<li><span>${formatDateFr(h.date)}</span><span>${formatSet(exercise, h)}</span></li>`).join("")}
-        </ul>
-      ` : ""}
+      ${renderLastTime(exercise)}
+      ${renderSteppers(exercise, getInput(exercise))}
+      <button class="btn btn-primary" data-action="save-set" data-id="${exercise.id}">
+        Enregistrer la série <span class="sets-count">${doneToday}/${target}</span>
+      </button>
     </div>
   `;
 }
 
-// Petit bouton "Plus jamais" (retire l'élément des propositions futures, réversible dans Progression).
-function renderExcludeButton(key, id) {
-  return `<button class="link-btn" data-action="exclude" data-key="${key}" data-item="${id}">🚫 Ne plus me le proposer</button>`;
+// Liens discrets sous un exercice : remplacer par un équivalent, ou ne plus jamais le proposer.
+function renderItemLinks(key, id) {
+  return `
+    <div class="item-links">
+      <button class="link-btn" data-action="swap-key" data-key="${key}">↻ Remplacer</button>
+      <button class="link-btn muted" data-action="exclude" data-key="${key}" data-item="${id}">Ne plus proposer</button>
+    </div>
+  `;
 }
 
 // ── Cartes des étapes
 
-// Un exercice noté (force ou exercice d'un duo).
-function renderExerciseBlock(exercise, { key, tag = "", kept, perItemSwap = false }) {
-  const pattern = exercise.pattern && PATTERN_LABELS[exercise.pattern] ? ` · ${PATTERN_LABELS[exercise.pattern]}` : "";
+// Titre + consigne sur une ligne, puis photo, lien vidéo et liens.
+function renderItemHead(name, target, tag = "") {
   return `
-    <div class="exercise-block">
-      <h2 class="exercise-name">${tag ? `<span class="duo-tag">${tag}</span>` : ""}${exercise.name}</h2>
-      <p class="exercise-fr">${exercise.fr}${pattern}</p>
-      <p class="exercise-target">${getExerciseSub(exercise)}</p>
-      ${renderExercisePhoto(exercise)}
-      ${youtubeLink(exercise.yt)}
-      ${kept ? renderLogging(exercise) : `
-        <div class="item-actions">
-          ${perItemSwap ? `<button class="link-btn" data-action="swap-key" data-key="${key}">↻ Remplacer celui-ci</button>` : ""}
-          ${renderExcludeButton(key, exercise.id)}
-        </div>
-      `}
+    <div class="item-head">
+      <h2 class="exercise-name">${tag ? `<span class="duo-tag">${tag}</span>` : ""}${name}</h2>
+      <span class="exercise-target">${target}</span>
     </div>
   `;
 }
 
-function renderChecklistItem(item, checkKey, mediaKey) {
-  const checked = uiState.checked.has(checkKey);
+function renderExerciseBlock(exercise, key, tag = "") {
   return `
-    <li class="mobility-row">
-      <div class="mobility-item ${checked ? "checked" : ""}">
-        <input type="checkbox" data-action="check" data-key="${checkKey}" ${checked ? "checked" : ""} />
-        <span class="mobility-item-text">
-          <span class="mobility-item-name">${item.name}</span><br/>
-          <span class="mobility-item-fr">${item.fr}</span>
-        </span>
-        <span class="mobility-item-sub">${item.sub}</span>
-        ${renderMediaToggle(mediaKey)}
+    <div class="exercise-block">
+      ${renderItemHead(exercise.name, getExerciseSub(exercise), tag)}
+      ${exercisePhoto(exercise)}
+      <div class="media-row">${videoLink(exercise.yt)}${renderItemLinks(key, exercise.id)}</div>
+      ${renderLogging(exercise)}
+    </div>
+  `;
+}
+
+function renderRoutineBlock(item, key, target) {
+  return `
+    <div class="exercise-block">
+      ${renderItemHead(item.name, target)}
+      ${item.note ? `<p class="photo-note warn">${item.note}</p>` : ""}
+      ${routinePhotos(item)}
+      <div class="media-row">${videoLink(item.yt)}${renderItemLinks(key, item.id)}</div>
+    </div>
+  `;
+}
+
+// Liste compacte (mobilité, étirements) : nom, dose, démo dépliable, et "remplacer" pour la mobilité.
+function renderListRow(item, mediaKey, replaceIndex = null) {
+  const open = uiState.openMedia.has(mediaKey);
+  return `
+    <li class="list-row">
+      <div class="list-row-main">
+        <span class="list-row-name">${item.name}</span>
+        <span class="list-row-sub">${item.sub}</span>
+        <button class="icon-btn ${open ? "open" : ""}" data-action="toggle-media" data-key="${mediaKey}" aria-label="Démo">${open ? "✕" : "▶"}</button>
+        ${replaceIndex === null ? "" : `<button class="icon-btn" data-action="replace-mobility" data-index="${replaceIndex}" aria-label="Remplacer">↻</button>`}
       </div>
-      ${renderRoutineMedia(item, mediaKey)}
+      ${open ? `<div class="list-row-media">${routinePhotos(item)}${videoLink(item.yt)}</div>` : ""}
     </li>
   `;
 }
 
 function renderStepBody(step, plan) {
-  const kept = Boolean(plan.kept[step.id]);
-
   if (step.kind === "mobility") {
-    return `
-      <p class="step-intro">Échauffement dynamique, identique à chaque séance.</p>
-      <ul class="mobility-list">${MOBILITY_ROUTINE.map((item, i) => renderChecklistItem(item, `mobility-${i}`, `mobility-${i}`)).join("")}</ul>
-    `;
+    return `<ul class="list">${plan.mobility.map((id, i) => renderListRow(findItem(id), `mobility-${id}`, i)).join("")}</ul>`;
   }
 
   if (step.kind === "cooldown") {
     const pattern = legsPattern(plan);
-    return `
-      <p class="step-intro">Rouleau puis étirements, choisis d'après ton exercice de jambes du jour (${PATTERN_LABELS[pattern]}).</p>
-      <ul class="mobility-list">${COOLDOWN[pattern].map((item, i) => renderChecklistItem(item, `cooldown-${pattern}-${i}`, `cooldown-${pattern}-${i}`)).join("")}</ul>
-    `;
+    return `<ul class="list">${COOLDOWN[pattern].map((item, i) => renderListRow(item, `cooldown-${pattern}-${i}`)).join("")}</ul>`;
   }
 
   if (step.kind === "footwork") {
-    const items = keysForStep(step).map((key) => {
+    return keysForStep(step).map((key) => {
       const item = findItem(plan.choices[key]);
-      if (!item) return "";
-      return `
-        <div class="routine-block">
-          <div class="routine-block-head">
-            ${kept ? `<input type="checkbox" data-action="check" data-key="${key}" ${uiState.checked.has(key) ? "checked" : ""} />` : ""}
-            <div class="routine-block-text">
-              <h2 class="exercise-name">${item.name}</h2>
-              <p class="exercise-fr">${item.fr}</p>
-            </div>
-            <span class="exercise-target">${item.sub}</span>
-          </div>
-          ${item.note ? `<p class="photo-note warn">${item.note}</p>` : ""}
-          ${renderRoutineMedia(item, key, { always: true })}
-          ${kept ? "" : `
-            <div class="item-actions">
-              <button class="link-btn" data-action="swap-key" data-key="${key}">↻ Remplacer celui-ci</button>
-              ${renderExcludeButton(key, item.id)}
-            </div>
-          `}
-        </div>
-      `;
+      return item ? renderRoutineBlock(item, key, item.sub) : "";
     }).join("");
-    return `<p class="step-intro">2 exercices, sans charge, le plus vite possible en restant propre. Récup 30-45s.</p>${items}`;
   }
 
   if (step.kind === "finisher") {
     const finisher = findItem(plan.choices[step.id]);
     if (!finisher) return "";
     return `
-      <h2 class="exercise-name">${finisher.name}</h2>
-      <p class="exercise-fr">${finisher.fr}</p>
-      <p class="finisher-detail">${finisher.detail}</p>
-      ${renderRoutineMedia(finisher, step.id, { always: true })}
-      ${kept
-        ? `<label class="done-check"><input type="checkbox" data-action="check" data-key="${step.id}" ${uiState.checked.has(step.id) ? "checked" : ""} /> Finisher fait</label>`
-        : `<div class="item-actions">${renderExcludeButton(step.id, finisher.id)}</div>`}
+      <div class="exercise-block">
+        <h2 class="exercise-name">${finisher.name}</h2>
+        <p class="finisher-detail">${finisher.detail}</p>
+        ${routinePhotos(finisher)}
+        <div class="media-row">${videoLink(finisher.yt)}${renderItemLinks(step.id, finisher.id)}</div>
+      </div>
     `;
   }
 
   if (step.kind === "duo") {
-    const blocks = keysForStep(step).map((key, i) => {
+    return keysForStep(step).map((key, i) => {
       const exercise = findExercise(plan.choices[key]);
-      return exercise ? renderExerciseBlock(exercise, { key, tag: `${step.id.slice(-1)}${"AB"[i]}`, kept, perItemSwap: true }) : "";
+      return exercise ? renderExerciseBlock(exercise, key, `${"AB"[i]}`) : "";
     }).join("");
-    return `<p class="step-intro">3 tours : enchaîne A puis B sans pause, puis repos ${step.rest}.</p>${blocks}`;
   }
 
   const exercise = findExercise(plan.choices[step.id]);
-  return exercise ? renderExerciseBlock(exercise, { key: step.id, kept }) : "";
+  return exercise ? renderExerciseBlock(exercise, step.id) : "";
 }
 
-function isSwappable(step) {
-  return ["footwork", "duo", "strength", "finisher"].includes(step.kind);
-}
-
-function isStepDone(step, plan) {
-  if (step.kind === "mobility") return MOBILITY_ROUTINE.every((_, i) => uiState.checked.has(`mobility-${i}`));
-  if (step.kind === "cooldown") {
-    const pattern = legsPattern(plan);
-    return COOLDOWN[pattern].every((_, i) => uiState.checked.has(`cooldown-${pattern}-${i}`));
-  }
-  if (step.kind === "footwork") return keysForStep(step).every((key) => uiState.checked.has(key));
-  if (step.kind === "finisher") return uiState.checked.has(step.id);
-  const today = storage.getTodaySets();
-  return keysForStep(step).every((key) => {
-    const ex = findExercise(plan.choices[key]);
-    return ex && today.filter((s) => s.exerciseId === ex.id).length >= targetSets(ex);
-  });
-}
-
-function renderStepBar(plan) {
+// Fine barre de progression : un trait par étape (fait, passé, en cours, à venir), touchable.
+function renderProgressBar(plan) {
   return `
-    <nav class="step-bar" aria-label="Étapes de la séance">
+    <nav class="progress-bar" aria-label="Étapes de la séance">
       ${STEPS.map((step, i) => `
-        <button class="step-chip ${i === plan.current ? "active" : ""} ${isStepDone(step, plan) ? "done" : ""}" data-action="go-step" data-index="${i}">
-          ${isStepDone(step, plan) ? "✓ " : ""}${step.short}
-        </button>
+        <button class="progress-seg ${plan.status[step.id] || ""} ${i === plan.current ? "current" : ""}" data-action="go-step" data-index="${i}" aria-label="${step.short}"><span></span></button>
       `).join("")}
     </nav>
   `;
 }
 
-function renderSeanceView() {
-  const plan = getPlan();
-  const step = STEPS[plan.current] || STEPS[0];
-  const kept = Boolean(plan.kept[step.id]);
-  const swipeable = isSwappable(step) && !kept;
-  const isLast = plan.current === STEPS.length - 1;
+// Petite ligne d'info sous le titre de l'étape (repos des duos, routine de mobilité…).
+function stepSubtitle(step, plan) {
+  if (step.kind === "duo") return `3 tours, A puis B sans pause · repos ${step.rest}`;
+  if (step.kind === "cooldown") return "Rouleau puis étirements";
+  return "";
+}
 
-  const decide = !isSwappable(step) ? "" : kept
-    ? `<button class="link-btn center" data-action="unkeep-step">Changer d'exercice</button>`
-    : `
-      <div class="decide-sticky">
-        <div class="decide-row">
-          <button class="btn btn-secondary" data-action="swap-step">↻ Autre${step.kind === "duo" ? " duo" : ""}</button>
-          <button class="btn btn-primary" data-action="keep-step">✓ Je garde</button>
-        </div>
-        <p class="swipe-hint">Glisse la carte : ← autre · je garde →</p>
-      </div>
-    `;
-
+function renderFinished(plan) {
+  const todayCount = storage.getTodaySets().length;
+  const done = STEPS.filter((s) => plan.status[s.id] === "done").length;
   return `
-    ${renderStepBar(plan)}
-    <section class="step-card" data-swipe="${swipeable ? "1" : "0"}">
-      <p class="step-kicker">Étape ${plan.current + 1}/${STEPS.length} · ${step.title}</p>
-      ${renderStepBody(step, plan)}
-      ${uiState.notice ? `<p class="notice">${uiState.notice}</p>` : ""}
-      ${decide}
+    ${renderProgressBar(plan)}
+    <section class="step-card finished">
+      <p class="finished-emoji">🎾</p>
+      <h2 class="exercise-name">Séance terminée</h2>
+      <p class="finished-detail">${done} étape${done > 1 ? "s" : ""} sur ${STEPS.length} · ${todayCount} série${todayCount > 1 ? "s" : ""} enregistrée${todayCount > 1 ? "s" : ""}</p>
+      <button class="btn btn-primary" data-action="open-progression">Voir ma progression</button>
     </section>
-    <div class="step-nav">
-      <button class="btn btn-secondary" data-action="prev-step" ${plan.current === 0 ? "disabled" : ""}>← Précédent</button>
-      <button class="btn btn-primary" data-action="next-step" ${isLast ? "disabled" : ""}>${isLast ? "Fin de séance" : "Suivant →"}</button>
-    </div>
   `;
 }
 
-// ── Historique des séances
+function renderSeanceView() {
+  const plan = getPlan();
+  if (plan.current >= STEPS.length) return renderFinished(plan);
+  const step = STEPS[plan.current];
+  const subtitle = stepSubtitle(step, plan);
+  return `
+    ${renderProgressBar(plan)}
+    <section class="step-card" data-swipe="1">
+      <div class="step-head">
+        <p class="step-kicker">${step.title}<span class="step-count">${plan.current + 1}/${STEPS.length}</span></p>
+        ${step.kind === "mobility" ? `<button class="shuffle-btn" data-action="shuffle-mobility">🔀 Mélanger</button>` : ""}
+      </div>
+      ${subtitle ? `<p class="step-sub">${subtitle}</p>` : ""}
+      ${renderStepBody(step, plan)}
+      ${uiState.notice ? `<p class="notice">${uiState.notice}</p>` : ""}
+      <p class="swipe-hint">← je passe · fait →</p>
+    </section>
+  `;
+}
+
+// ── Page Progression (ouverte par le bouton des séances)
 
 const WEEKDAYS_FR = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
 
-// Liste des séances passées, ouverte en touchant le compteur de séances en haut.
-function renderHistorySheet() {
-  if (!uiState.historyOpen) return "";
+function renderSessionsCard() {
   const sessions = storage.getSessions().reverse();
   const rows = sessions.map((session) => {
     const weekday = WEEKDAYS_FR[new Date(`${session.date}T12:00:00`).getDay()];
@@ -475,29 +398,22 @@ function renderHistorySheet() {
       </li>
     `;
   }).join("");
-
   return `
-    <div class="sheet-backdrop" data-action="close-history"></div>
-    <div class="sheet" role="dialog" aria-label="Historique des séances">
-      <div class="sheet-header">
-        <h2 class="sheet-title">${sessions.length} séance${sessions.length > 1 ? "s" : ""}</h2>
-        <button class="sheet-close" data-action="close-history" aria-label="Fermer">✕</button>
+    <section class="card">
+      <div class="card-header"><h2 class="card-title">Mes séances</h2></div>
+      <div class="card-body">
+        ${sessions.length ? `<ul class="history-sessions">${rows}</ul>` : `<p class="empty-state">Aucune séance enregistrée pour l'instant.</p>`}
       </div>
-      ${sessions.length
-        ? `<ul class="history-sessions">${rows}</ul>`
-        : `<p class="empty-state">Aucune séance enregistrée pour l'instant.</p>`}
-    </div>
+    </section>
   `;
 }
-
-// ── Onglet Progression
 
 function renderExcludedCard() {
   const excluded = [...storage.getExcluded()];
   return `
-    <section class="card excluded-card">
+    <section class="card">
       <div class="card-header">
-        <h2 class="card-title">Exercices exclus<span class="card-title-fr">Ceux que tu as marqués « Ne plus me le proposer »</span></h2>
+        <h2 class="card-title">Exercices exclus<span class="card-title-fr">Ceux que tu as marqués « Ne plus proposer »</span></h2>
       </div>
       <div class="card-body">
         ${excluded.length
@@ -512,7 +428,7 @@ function renderExcludedCard() {
 
 function renderBackupCard() {
   return `
-    <section class="card backup-card">
+    <section class="card">
       <div class="card-header">
         <h2 class="card-title">Sauvegarde<span class="card-title-fr">Tes données restent dans ce navigateur : exporte-les de temps en temps</span></h2>
       </div>
@@ -537,7 +453,7 @@ function renderSyncCard() {
 
   if (!sync.isEnabled()) {
     return `
-      <section class="card sync-card">
+      <section class="card">
         <div class="card-header">
           <h2 class="card-title">Synchronisation entre appareils<span class="card-title-fr">Le même historique sur ton téléphone et ton laptop</span></h2>
         </div>
@@ -563,7 +479,7 @@ function renderSyncCard() {
   }[status.state];
 
   return `
-    <section class="card sync-card">
+    <section class="card">
       <div class="card-header">
         <h2 class="card-title">Synchronisation entre appareils<span class="card-title-fr">${stateText}</span></h2>
       </div>
@@ -604,46 +520,41 @@ function importBackup(file) {
 function renderProgressionView() {
   const total = storage.getTotalSessions();
   const totalSets = storage.getAllSets().length;
+  const firstDate = storage.getFirstSessionDate();
 
   if (!uiState.progressionExerciseId) {
     const last = storage.getAllSets().filter((s) => findExercise(s.exerciseId)).pop();
     uiState.progressionExerciseId = last ? last.exerciseId : EXERCISES[0].id;
   }
   const selected = findExercise(uiState.progressionExerciseId);
-
   const options = EXERCISES.map((ex) => `
-    <option value="${ex.id}" ${ex.id === uiState.progressionExerciseId ? "selected" : ""}>${ex.name} (${ex.fr})</option>
+    <option value="${ex.id}" ${ex.id === uiState.progressionExerciseId ? "selected" : ""}>${ex.name}</option>
   `).join("");
-
   const rows = storage.getSetsForExercise(selected.id).reverse();
 
   return `
     <div class="progress-summary">
       <div class="progress-stat">
         <div class="progress-stat-value">${total}</div>
-        <div class="progress-stat-label">Séances complétées</div>
+        <div class="progress-stat-label">Séances</div>
       </div>
       <div class="progress-stat">
         <div class="progress-stat-value">${totalSets}</div>
-        <div class="progress-stat-label">Séries loguées</div>
+        <div class="progress-stat-label">Séries</div>
       </div>
     </div>
+    <p class="phase-line">Force : phase ${currentPhase.label} · bloc ${currentPhase.block}${firstDate ? ` · depuis le ${formatDateFr(firstDate)}` : ""}</p>
 
-    <select class="select-field" data-action="select-exercise" id="exercise-select">${options}</select>
-
-    <div class="chart-wrap">
-      <canvas id="progress-chart" height="180"></canvas>
-    </div>
-
+    <select class="select-field" id="exercise-select">${options}</select>
+    <div class="chart-wrap"><canvas id="progress-chart" height="180"></canvas></div>
     ${rows.length ? `
       <table class="history-table">
         <thead><tr><th>Date</th><th>Série</th></tr></thead>
-        <tbody>
-          ${rows.map((r) => `<tr><td>${formatDateFr(r.date)}</td><td>${formatSet(selected, r)}</td></tr>`).join("")}
-        </tbody>
+        <tbody>${rows.map((r) => `<tr><td>${formatDateFr(r.date)}</td><td>${formatSet(selected, r)}</td></tr>`).join("")}</tbody>
       </table>
     ` : `<p class="empty-state">Aucune série loguée pour cet exercice.</p>`}
 
+    ${renderSessionsCard()}
     ${renderExcludedCard()}
     ${renderSyncCard()}
     ${renderBackupCard()}
@@ -657,8 +568,6 @@ function renderChart() {
   const exercise = findExercise(uiState.progressionExerciseId);
   const byReps = exercise.metric === "reps";
   const sets = storage.getSetsForExercise(exercise.id);
-  const labels = sets.map((s) => s.date);
-  const data = sets.map((s) => (byReps ? s.reps : s.weightLb));
 
   if (chartInstance) {
     chartInstance.destroy();
@@ -668,10 +577,10 @@ function renderChart() {
   chartInstance = new Chart(canvas.getContext("2d"), {
     type: "line",
     data: {
-      labels,
+      labels: sets.map((s) => s.date),
       datasets: [{
         label: byReps ? "Reps" : "Poids (lb)",
-        data,
+        data: sets.map((s) => (byReps ? s.reps : s.weightLb)),
         borderColor: "#C1652F",
         backgroundColor: "rgba(193, 101, 47, 0.15)",
         tension: 0.25,
@@ -694,7 +603,6 @@ function render() {
   currentPhase = getCurrentPhase(storage.getFirstSessionDate(), storage.today());
   updateHeader();
   viewContainer.innerHTML = uiState.view === "seance" ? renderSeanceView() : renderProgressionView();
-  historySheet.innerHTML = renderHistorySheet();
   if (uiState.view === "progression") renderChart();
 }
 
@@ -715,39 +623,47 @@ function setValues(exercise, input) {
   return { weightLb: input.weightLb, reps: input.reps };
 }
 
-function currentStep() {
-  return STEPS[getPlan().current] || STEPS[0];
-}
-
-function goToStep(index) {
-  updatePlan((plan) => { plan.current = Math.max(0, Math.min(STEPS.length - 1, index)); });
+function scrollTop() {
   if (typeof window.scrollTo === "function") window.scrollTo(0, 0);
 }
 
-// "Pas aujourd'hui" : toute l'étape (bouton "Autre" ou swipe à gauche) ou un seul élément ("Remplacer celui-ci").
-function swap(key) {
-  let changed = false;
-  updatePlan((plan, ctx) => {
-    changed = key ? swapKey(plan, key, ctx) : swapStep(plan, currentStep(), ctx);
-  });
-  uiState.notice = changed ? "" : "Pas d'autre équivalent disponible pour l'instant.";
+function goToStep(index) {
+  updatePlan((plan) => { plan.current = Math.max(0, Math.min(STEPS.length, index)); });
+  uiState.notice = "";
+  scrollTop();
 }
 
-function keepStep() {
-  updatePlan((plan) => { plan.kept[currentStep().id] = true; });
+// Fin d'une étape : "done" (swipe à droite) ou "skipped" (swipe à gauche), puis l'étape suivante.
+function finishStep(status) {
+  updatePlan((plan) => {
+    const step = STEPS[plan.current];
+    if (step) plan.status[step.id] = status;
+    plan.current = Math.min(STEPS.length, plan.current + 1);
+  });
+  uiState.notice = "";
+  scrollTop();
 }
 
 function exclude(key, id) {
-  const ctx = planContext();
-  if (!canExclude(key, id, ctx)) {
-    uiState.notice = "C'est le dernier équivalent disponible : remets d'abord un exercice exclu (onglet Progression).";
+  if (!canExclude(key, id, planContext())) {
+    uiState.notice = "C'est le dernier équivalent disponible : remets d'abord un exercice exclu (page Progression).";
     return;
   }
   storage.setExcluded(id, true);
-  uiState.notice = `« ${exerciseName(id)} » ne te sera plus proposé. Tu peux le remettre dans l'onglet Progression.`;
+  uiState.notice = `« ${exerciseName(id)} » ne te sera plus proposé (réversible dans la page Progression).`;
+}
+
+function openView(view) {
+  uiState.view = view;
+  uiState.notice = "";
+  scrollTop();
 }
 
 viewContainer.addEventListener("click", (e) => {
+  if (suppressClick) {
+    suppressClick = false;
+    return;
+  }
   const target = e.target.closest("[data-action]");
   if (!target) return;
   const action = target.dataset.action;
@@ -757,20 +673,19 @@ viewContainer.addEventListener("click", (e) => {
 
   if (action === "go-step") {
     goToStep(parseInt(target.dataset.index, 10));
-  } else if (action === "next-step") {
-    goToStep(getPlan().current + 1);
-  } else if (action === "prev-step") {
-    goToStep(getPlan().current - 1);
-  } else if (action === "swap-step") {
-    swap(null);
   } else if (action === "swap-key") {
-    swap(target.dataset.key);
-  } else if (action === "keep-step") {
-    keepStep();
-  } else if (action === "unkeep-step") {
-    updatePlan((plan) => { delete plan.kept[currentStep().id]; });
+    updatePlan((plan, ctx) => {
+      if (!swapKey(plan, target.dataset.key, ctx)) uiState.notice = "Pas d'autre équivalent disponible pour l'instant.";
+    });
   } else if (action === "exclude") {
     exclude(target.dataset.key, target.dataset.item);
+  } else if (action === "shuffle-mobility") {
+    updatePlan((plan, ctx) => shuffleMobility(plan, ctx.excluded));
+    uiState.openMedia.clear();
+  } else if (action === "replace-mobility") {
+    updatePlan((plan, ctx) => replaceMobility(plan, parseInt(target.dataset.index, 10), ctx.excluded));
+  } else if (action === "open-progression") {
+    openView("progression");
   } else if (action === "include") {
     storage.setExcluded(target.dataset.item, false);
   } else if (action === "toggle-media") {
@@ -803,11 +718,7 @@ viewContainer.addEventListener("click", (e) => {
 viewContainer.addEventListener("change", (e) => {
   const target = e.target;
   const ex = target.dataset.id ? findExercise(target.dataset.id) : null;
-  if (target.dataset.action === "check") {
-    if (target.checked) uiState.checked.add(target.dataset.key);
-    else uiState.checked.delete(target.dataset.key);
-    render();
-  } else if (target.dataset.role === "weight-input") {
+  if (target.dataset.role === "weight-input") {
     // Une saisie libre est ramenée au poids standard le plus proche (ex. 52 → 50 lb).
     getInput(ex).weightLb = snapWeight(ex.equipment, parseFloat(target.value) || 0);
     render();
@@ -824,40 +735,47 @@ viewContainer.addEventListener("change", (e) => {
   }
 });
 
-// ── Swipe sur la carte (tant que l'exercice n'est pas gardé) : gauche = autre, droite = je garde.
-// Les gestes qui partent près des bords sont ignorés (geste "Retour" de Safari), et un geste
-// plutôt vertical est laissé au défilement de la page.
+// ── Swipe de la carte (doigt ou souris) : droite = fait, gauche = je passe, et dans les deux cas étape suivante.
+// Au doigt, les gestes qui partent près des bords sont ignorés (geste "Retour" de Safari), et un geste
+// plutôt vertical est laissé au défilement de la page. Un glissement ne déclenche pas le bouton sous le doigt.
 let swipe = null;
+let suppressClick = false;
 
-viewContainer.addEventListener("touchstart", (e) => {
+viewContainer.addEventListener("pointerdown", (e) => {
   const card = e.target.closest('.step-card[data-swipe="1"]');
-  if (!card || e.touches.length !== 1 || e.target.closest("input, a")) return;
-  const t = e.touches[0];
-  if (t.clientX < SWIPE_EDGE_PX || t.clientX > window.innerWidth - SWIPE_EDGE_PX) return;
-  swipe = { card, x0: t.clientX, y0: t.clientY, dx: 0, active: false };
-}, { passive: true });
+  if (!card || !e.isPrimary || e.button > 0 || e.target.closest("input, select, a")) return;
+  if (e.pointerType === "touch" && (e.clientX < SWIPE_EDGE_PX || e.clientX > window.innerWidth - SWIPE_EDGE_PX)) return;
+  swipe = { card, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, active: false };
+});
 
-viewContainer.addEventListener("touchmove", (e) => {
-  if (!swipe) return;
-  const t = e.touches[0];
-  const dx = t.clientX - swipe.x0;
-  const dy = t.clientY - swipe.y0;
+viewContainer.addEventListener("pointermove", (e) => {
+  if (!swipe || e.pointerId !== swipe.id) return;
+  const dx = e.clientX - swipe.x0;
+  const dy = e.clientY - swipe.y0;
   if (!swipe.active) {
-    if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.3) swipe.active = true;
-    else if (Math.abs(dy) > 12) { swipe = null; return; }
-    else return;
+    if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      swipe.active = true;
+      try { swipe.card.setPointerCapture(e.pointerId); } catch (err) { /* capture indisponible */ }
+    } else if (Math.abs(dy) > 12) {
+      swipe = null;
+      return;
+    } else {
+      return;
+    }
   }
   swipe.dx = dx;
   swipe.card.style.transition = "none";
   swipe.card.style.transform = `translateX(${dx}px) rotate(${dx / 40}deg)`;
   swipe.card.dataset.dir = dx < -SWIPE_THRESHOLD_PX ? "left" : dx > SWIPE_THRESHOLD_PX ? "right" : "";
-}, { passive: true });
+});
 
-function endSwipe() {
-  if (!swipe) return;
+function endSwipe(e) {
+  if (!swipe || (e && e.pointerId !== swipe.id)) return;
   const { card, dx, active } = swipe;
   swipe = null;
   if (!active) return;
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 0);
   card.style.transition = "transform 0.18s ease-out";
   if (Math.abs(dx) < SWIPE_THRESHOLD_PX) {
     card.style.transform = "";
@@ -866,24 +784,22 @@ function endSwipe() {
   }
   card.style.transform = `translateX(${dx < 0 ? -window.innerWidth : window.innerWidth}px) rotate(${dx < 0 ? -12 : 12}deg)`;
   setTimeout(() => {
-    uiState.notice = "";
-    if (dx < 0) swap(null);
-    else keepStep();
+    finishStep(dx > 0 ? "done" : "skipped");
     render();
   }, 180);
 }
 
-viewContainer.addEventListener("touchend", endSwipe);
-viewContainer.addEventListener("touchcancel", endSwipe);
+viewContainer.addEventListener("pointerup", endSwipe);
+viewContainer.addEventListener("pointercancel", endSwipe);
 
-sessionBadge.addEventListener("click", () => {
-  uiState.historyOpen = true;
+backBtn.addEventListener("click", () => {
+  if (uiState.view === "progression") openView("seance");
+  else goToStep(getPlan().current - 1);
   render();
 });
 
-historySheet.addEventListener("click", (e) => {
-  if (!e.target.closest("[data-action=\"close-history\"]")) return;
-  uiState.historyOpen = false;
+sessionBadge.addEventListener("click", () => {
+  openView(uiState.view === "progression" ? "seance" : "progression");
   render();
 });
 
@@ -896,15 +812,6 @@ if (typeof document.addEventListener === "function") {
   });
 }
 if (typeof window !== "undefined") window.addEventListener("online", () => sync.syncNow());
-
-bottomNav.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-view]");
-  if (!btn) return;
-  uiState.view = btn.dataset.view;
-  uiState.notice = "";
-  [...bottomNav.children].forEach((c) => c.classList.toggle("active", c === btn));
-  render();
-});
 
 render();
 sync.syncNow();
